@@ -23,16 +23,19 @@ class VillainDeck(object):
     def play_turn(self, game):
         game.log("-----Villain phase-----")
         for villain in self.current:
-            game.log(f"Villain: {villain}")
-            villain.effect(game)
+            villain.play_turn(game)
 
     def reveal(self, game):
         for villain in self.current:
             villain.took_damage = False
         while len(self.current) < self._max and len(self._deck) > 0:
+            death_eaters = sum(1 for v in game.villain_deck.current if v.name == "Death Eater")
             villain = self._deck.pop()
             self.current.append(villain)
             villain.on_reveal(game)
+            if death_eaters > 0:
+                game.log(f"Death Eater (x{death_eaters}): Villain revealed, ALL heroes lose {death_eaters}💜")
+                game.heroes.all_heroes(game, lambda game, hero: hero.remove_health(game, death_eaters))
 
     def choose_villain(self, game, prompt="Choose a villain: "):
         if len(self.current) == 1:
@@ -47,7 +50,8 @@ class VillainDeck(object):
 
 
 class Villain(object):
-    def __init__(self, name, description, reward_desc, health, effect=lambda game: None, on_reveal=lambda game: None, reward=lambda game: None):
+    def __init__(self, name, description, reward_desc, health, effect=lambda game: None, on_reveal=lambda game: None,
+                 reward=lambda game: None, on_stun=lambda game: None, on_recover_from_stun=lambda game:None):
         self.name = name
         self.description = description
         self.reward_desc = reward_desc
@@ -55,14 +59,32 @@ class Villain(object):
         self.effect = effect
         self.on_reveal = on_reveal
         self._reward = reward
+        self._on_stun = on_stun
+        self._on_recover_from_stun = on_recover_from_stun
 
         self._damage = 0
         self.took_damage = False
+        self._stunned = False
+        self._stunned_by = None
 
     def display_state(self, window, row, i):
         window.addstr(row  , 1, f"{i}: {self.name} ({self._damage}↯/{self._health}💜)")
+        if self._stunned:
+            window.addstr(" *stunned*", curses.A_BOLD | curses.color_pair(1))
         window.addstr(row+1, 1, f"     {self.description}")
         window.addstr(row+2, 1, f"     Reward: {self.reward_desc}")
+
+    def play_turn(self, game):
+        if self._stunned:
+            game.log(f"{self.name} is stunned!")
+            if game.heroes.active_hero == self._stunned_by:
+                game.log(f"{self.name} was stunned by {self._stunned_by.name}, so recovers")
+                self._stunned = False
+                self._stunned_by = None
+                self._on_recover_from_stun(game)
+            return
+        game.log(f"Villain: {self}")
+        self.effect(game)
 
     def __str__(self):
         return f"{self.name} ({self._damage}/{self._health}), {self.description}"
@@ -81,8 +103,13 @@ class Villain(object):
         if self._damage < 0:
             self._damage = 0
 
+    def stun(self, game):
+        self._stunned = True
+        self._stunned_by = game.heroes.active_hero
+        self._on_stun(game)
+
     def reward(self, game):
-        game.log(f"{self.name} defeated!")
+        game.log(f"{self.name} defeated! {self.reward_desc}")
         self._reward(game)
 
 
@@ -96,7 +123,10 @@ class Draco(Villain):
     def control_callback(self, game, amount):
         if amount < 1:
             return
-        game.log(f"{self.name}: 💀 added, {game.heroes.active_hero.name} loses 2💜 for each")
+        if self._stunned:
+            game.log(f"{self.name} is stunned! No penalty for added 💀")
+            return
+        game.log(f"{self.name}: {amount}💀 added, {game.heroes.active_hero.name} loses 2💜 for each")
         for _ in range(amount):
             game.heroes.active_hero.remove_health(game, 2)
 
@@ -113,6 +143,9 @@ class Crabbe(Villain):
                          reward=self.__reward)
 
     def discard_callback(self, game, hero):
+        if self._stunned:
+            game.log(f"{self.name} is stunned! No penalty for discard")
+            return
         game.log(f"{self.name}: {hero.name} discarded, so loses 1💜")
         hero.remove_health(game, 1)
 
@@ -140,7 +173,10 @@ class Lucius(Villain):
     def control_callback(self, game, amount):
         if amount < 1:
             return
-        game.log(f"{self.name}: 💀 added, all Villains heal 1↯ for each")
+        if self._stunned:
+            game.log(f"{self.name} is stunned! No penalty for added 💀")
+            return
+        game.log(f"{self.name}: {amount}💀 added, all Villains heal 1↯ for each")
         for _ in range(amount):
             game.villain_deck.all_villains(game, lambda game, villain: villain.remove_damage(game, 1))
 
@@ -150,7 +186,6 @@ class Lucius(Villain):
         game.locations.remove_control(game)
 
 def basilisk_reward(game):
-    # TODO solve problem of petrification and basilisk together
     game.heroes.basilisk_defeated(game)
     game.heroes.all_heroes(game, lambda game, hero: hero.draw(game))
     game.locations.remove_control(game)
@@ -194,9 +229,9 @@ game_two_villains = [
     # TODO also creature
     Villain("Basilisk", "Heroes cannot draw extra cards",
             "ALL heroes draw a card; remove 1💀", 8,
-            # TODO solve disallowed drawing as a result of forced discard
             on_reveal=lambda game: game.heroes.basilisk_revealed(game),
-            reward=basilisk_reward),
+            reward=basilisk_reward, on_stun=lambda game: game.heroes.basilisk_defeated(game),
+            on_recover_from_stun=lambda game: game.heroes.basilisk_revealed(game)),
     Villain("Tom Riddle", "For each Ally in hand, lose 2💜 or discard",
             "ALL heroes gain 2💜 or take Ally from discard", 6,
             effect=riddle_effect, reward=lambda game: game.heroes.all_heroes(game, riddle_reward)),
@@ -207,7 +242,15 @@ def dementor_reward(game):
     game.locations.remove_control(game)
 
 def pettigrew_effect(game):
-    pass
+    hero = game.heroes.active_hero
+    card = hero.reveal_top_card(game)
+    if card is None:
+        game.log(f"{hero.name} has no cards left to reveal")
+        return
+    game.log(f"{hero.name} revealed {card}")
+    if card.cost >= 1:
+        game.heroes.active_hero.discard_top_card(game)
+        game.locations.add_control(game)
 
 def pettigrew_reward(game):
     game.locations.remove_control(game)
@@ -218,7 +261,7 @@ def pettigrew_per_hero(game, hero):
     if len(spells) == 0:
         game.log(f"{hero.name} has no spells in discard")
         return
-    game.log(f"Spells in {hero.name}'s discard: {spells_str}")
+    game.log(f"Spells in {hero.name}'s discard:")
     for i, spell in enumerate(spells):
         game.log(f" {i}: {spell}")
     # TODO allow to skip?
@@ -253,7 +296,8 @@ game_four_villains = [
             reward=death_eater_reward),
     Villain("Barty Crouch Jr.", "Heroes cannot remove 💀", "Remove 2💀", 7,
             on_reveal=lambda game: game.locations.disallow_remove_control(game),
-            reward=crouch_reward),
+            reward=crouch_reward, on_stun=lambda game: game.locations.allow_remove_control(game),
+            on_recover_from_stun=lambda game: game.locations.disallow_remove_control(game)),
 ]
 
 class Umbridge(Villain):
@@ -265,6 +309,9 @@ class Umbridge(Villain):
 
     def acquire_callback(self, game, hero, card):
         if card.cost >= 4:
+            if self._stunned:
+                game.log(f"{self.name} is stunned! No penalty for acquire")
+                return
             game.log(f"{self.name}: {game.heroes.active_hero.name} acquired {card}, so loses 1💜")
             hero.remove_health(game, 1)
 
@@ -316,7 +363,8 @@ game_six_villains = [
             reward=bellatrix_reward),
     Villain("Fenrir Greyback", "Heroes cannot gain 💜", "ALL heroes gain 3💜, remove 2💀", 8,
             on_reveal=lambda game: game.heroes.greyback_revealed(game),
-            reward=greyback_reward),
+            reward=greyback_reward, on_stun=lambda game: game.heroes.greyback_defeated(game),
+            on_recover_from_stun=lambda game: game.heroes.greyback_revealed(game)),
 ]
 
 class GameSixVoldemort(Villain):
@@ -351,6 +399,9 @@ def GameSevenVoldemort(Villain):
 
     def control_callback(self, game, amount):
         if amount > -1:
+            return
+        if self._stunned:
+            game.log(f"{self.name} is stunned! No penalty for removed 💀")
             return
         game.log(f"{self.name}: 💀 removed, ALL heroes lose 1💜 for each")
         for _ in range(-amount):

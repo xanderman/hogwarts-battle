@@ -10,9 +10,9 @@ class QuitGame(Exception):
 class Heroes(object):
     def __init__(self, window, game_num, hero_names):
         self._window = window
-        self._heroes = [Hermione(), Ginny(), Neville(), Luna()]
+        self._heroes = [HEROES[name](game_num) for name in hero_names]
         self._pads = [curses.newpad(100,100) for _ in self._heroes]
-        self._heroes = [HEROES[name]() for name in hero_names]
+        self._harry = self._heroes[hero_names.index("Harry")] if "Harry" in hero_names else None
         self._current = 0
 
     def display_state(self):
@@ -37,6 +37,11 @@ class Heroes(object):
     def __len__(self):
         return len(self._heroes)
 
+    def play_turn(self, game):
+        if self._harry:
+            self._harry._used_ability = False
+        self.active_hero.play_turn(game)
+
     @property
     def active_hero(self):
         return self._heroes[self._current]
@@ -49,18 +54,21 @@ class Heroes(object):
     def previous_hero(self):
         return self._heroes[(self._current - 1) % len(self._heroes)]
 
-    def choose_hero(self, game, prompt="Choose a hero: ", allow_active=True):
+    def choose_hero(self, game, prompt="Choose a hero: ", disallow=None, dissallow_msg="{} cannot be chosen!"):
         if len(self._heroes) == 1:
             return self._heroes[0]
 
         while True:
-            choice = int(game.input(prompt, range(len(self._heroes))))
-            if not allow_active and choice == self._current:
-                game.log("Cannot choose active hero!")
-            return self._heroes[choice]
+            chosen = self._heroes[int(game.input(prompt, range(len(self._heroes))))]
+            if chosen == disallow:
+                game.log(dissallow_msg.format(disallow.name))
+                continue
+            return chosen
 
-    def all_heroes(self, game, effect):
+    def all_heroes(self, game, effect, skip_active=False):
         for hero in self._heroes:
+            if skip_active and hero == self.active_hero:
+                continue
             effect(game, hero)
 
     def next(self):
@@ -122,12 +130,21 @@ class Heroes(object):
         for hero in self._heroes:
             hero.remove_discard_callback(game, callback)
 
+    def add_health_callback(self, game, callback):
+        for hero in self._heroes:
+            hero.add_health_callback(game, callback)
+
+    def remove_health_callback(self, game, callback):
+        for hero in self._heroes:
+            hero.remove_health_callback(game, callback)
+
 
 class Hero(object):
-    def __init__(self, name, starting_deck, starting_health=10):
+    def __init__(self, name, game_num, starting_deck):
         self.name = name
-        self._max_health = starting_health
-        self._health = starting_health
+        self._game_num = game_num
+        self._max_health = 10
+        self._health = 10
         self._deck = []
         self._hand = []
         self._play_area = []
@@ -136,6 +153,7 @@ class Hero(object):
         self._influence_tokens = 0
         self._acquire_callbacks = []
         self._discard_callbacks = []
+        self._health_callbacks = []
         self._drawing_allowed = True
         self._healing_allowed = True
         self._basilisk_present = False
@@ -143,6 +161,7 @@ class Hero(object):
         self._can_put_allies_in_deck = False
         self._can_put_items_in_deck = False
         self._can_put_spells_in_deck = False
+        self._only_one_damage = False
         self._extra_villain_rewards = []
         self._extra_card_effects = []
 
@@ -178,11 +197,11 @@ class Hero(object):
     def add_health(self, game, amount=1):
         if amount == 0:
             return
-        if amount > 0 and not self.healing_allowed:
-            game.log("Healing not allowed!")
-            return
         if self.is_stunned(game):
             game.log(f"{self.name} is stunned and cannot gain/lose health!")
+            return
+        if amount > 0 and not self.healing_allowed:
+            game.log(f"{self.name}: healing not allowed!")
             return
         if amount > 0 and self._health == self._max_health:
             game.log(f"{self.name} is already at max health!")
@@ -194,6 +213,7 @@ class Hero(object):
             game.log(f"{self.name} loses {-amount} health!")
         else:
             game.log(f"{self.name} gains {amount} health!")
+        health_start = self._health
         self._health += amount
         if self._health > self._max_health:
             self._health = self._max_health
@@ -205,6 +225,9 @@ class Hero(object):
             self._damage_tokens = 0
             self._influence_tokens = 0
             self.choose_and_discard(game, len(self._hand) // 2)
+        if health_start != self._health:
+            for callback in self._health_callbacks:
+                callback.health_callback(game, self, self._health - health_start)
 
     def remove_health(self, game, amount=1):
         self.add_health(game, -amount)
@@ -227,7 +250,7 @@ class Hero(object):
 
     @property
     def healing_allowed(self):
-        return self._healing_allowed and not self._greyback_present
+        return self._healing_allowed and not self._greyback_present and not self.is_stunned(None)
 
     def draw(self, game, count=1, end_of_turn=False):
         if not end_of_turn and not self.drawing_allowed:
@@ -254,8 +277,17 @@ class Hero(object):
             return None
         return self._deck[-1]
 
+    def discard_top_card(self, game, with_callbacks=True):
+        card = self._deck.pop()
+        self._discard_card(game, card, with_callbacks)
+        return card
+
     def discard(self, game, which, with_callbacks=True):
         card = self._hand.pop(which)
+        self._discard_card(game, card, with_callbacks)
+        return card
+
+    def _discard_card(self, game, card, with_callbacks=True):
         self._discard.append(card)
         game.log(f"{self.name} discarded {card}")
         card.discard_effect(game, self)
@@ -265,12 +297,14 @@ class Hero(object):
             callback.discard_callback(game, self)
 
     def choose_and_discard(self, game, count=1, with_callbacks=True):
+        discarded = []
         for i in range(count):
             if len(self._hand) == 0:
                 game.log(f"{self.name} has no cards to discard!")
                 return
             choice = int(game.input(f"Choose card for {self.name} to discard: ", range(len(self._hand))))
-            self.discard(game, choice, with_callbacks)
+            discarded.append(self.discard(game, choice, with_callbacks))
+        return discarded
 
     def add_acquire_callback(self, game, callback):
         self._acquire_callbacks.append(callback)
@@ -284,6 +318,12 @@ class Hero(object):
     def remove_discard_callback(self, game, callback):
         self._discard_callbacks.remove(callback)
 
+    def add_health_callback(self, game, callback):
+        self._health_callbacks.append(callback)
+
+    def remove_health_callback(self, game, callback):
+        self._health_callbacks.remove(callback)
+
     def can_put_allies_in_deck(self, game):
         self._can_put_allies_in_deck = True
 
@@ -292,6 +332,9 @@ class Hero(object):
 
     def can_put_spells_in_deck(self, game):
         self._can_put_spells_in_deck = True
+
+    def allow_only_one_damage(self, game):
+        self._only_one_damage = True
 
     def _acquire(self, game, card, top_of_deck=False):
         if top_of_deck:
@@ -333,7 +376,7 @@ class Hero(object):
         card = self._hand.pop(which)
         card.play(game)
         for effect in self._extra_card_effects:
-            effect(card, game)
+            effect(game, card)
         self._play_area.append(card)
 
     def choose_and_play(self, game):
@@ -364,15 +407,20 @@ class Hero(object):
             return
         if len(game.villain_deck.current) == 0:
             game.log("No villains to assign ↯ to!")
-            return
+            return None
         choices = ['c'] + [str(i) for i in range(len(game.villain_deck.current))]
         choice = game.input("Choose villain to assign ↯ to ('c' to cancel): ", choices)
         if choice == 'c':
-            return
-        if game.villain_deck.current[int(choice)].add_damage(game):
+            return None
+        villain = game.villain_deck.current[int(choice)]
+        if self._only_one_damage and villain.took_damage:
+            game.log(f"{villain.name} has already been assigned damage!")
+            return None
+        self.remove_damage(game)
+        if villain.add_damage(game):
             for reward in self._extra_villain_rewards:
                 reward(game)
-        self.remove_damage(game)
+        return villain
 
     def add_influence(self, game, amount=1):
         self._influence_tokens += amount
@@ -407,7 +455,6 @@ class Hero(object):
                 case "b":
                     self.buy_card(game)
                 case "e":
-                    self.end_turn(game)
                     return
                 case "q":
                     raise QuitGame()
@@ -434,6 +481,7 @@ class Hero(object):
         self._can_put_allies_in_deck = False
         self._can_put_items_in_deck = False
         self._can_put_spells_in_deck = False
+        self._only_one_damage = False
         self._extra_villain_rewards = []
         self._extra_card_effects = []
         self.draw(game, 5, True)
@@ -443,6 +491,10 @@ def base_ally_effect(game):
     hero = game.heroes.active_hero
     if hero._health == hero._max_health:
         game.log("{hero.name} is already at max health, gaining 1↯")
+        hero.add_damage(game, 1)
+        return
+    if not hero.healing_allowed:
+        game.log("{hero.name} can't heal, gaining 1↯")
         hero.add_damage(game, 1)
         return
     match game.input("Choose effect: (d)↯, (h)💜: ", "dh"):
@@ -476,7 +528,7 @@ def broom_effect(game):
     game.heroes.active_hero.add_damage(game)
     game.heroes.active_hero.add_extra_villain_reward(game, lambda game: game.heroes.active_hero.add_influence(game))
 
-def add_damage_if_ally(card, game):
+def add_damage_if_ally(game, card):
     if card.is_ally():
         game.log("Ally {card.name} played, beans add damage")
         game.heroes.active_hero.add_damage(game)
@@ -521,15 +573,16 @@ def lion_hat_effect(game):
     for hero in game.heroes._heroes:
         if hero == game.heroes.active_hero:
             continue
-        all_cards += hero._hand
-    if any(card.name in broom_cards for card in all_cards):
-        game.heroes.active_hero.add_damage(game)
-    pass
+        for card in hero._hand:
+            if card.name in broom_cards:
+                game.log(f"{hero.name} has {card.name}, {game.heroes.active_hero.name} gains 1↯")
+                game.heroes.active_hero.add_damage(game)
+                return
 
 
 class Hermione(Hero):
-    def __init__(self):
-        super().__init__("Hermione", [
+    def __init__(self, game_num):
+        super().__init__("Hermione", game_num, [
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
@@ -541,11 +594,43 @@ class Hermione(Hero):
             hogwarts.Item("Time-Turner", "Gain 1💰, may put acquired Spells on top of deck", 0, time_turner_effect),
             hogwarts.Item("The Tales of Beedle the Bard", "Gain 2💰, or ALL heroes gain 1💰", 0, beedle_effect),
         ])
+        self._spells_played = 0
+        self._used_ability = False
+
+    def play_turn(self, game):
+        self._spells_played = 0
+        self._used_ability = False
+        super().play_turn(game)
+
+    def play_card(self, game, which):
+        if self._hand[which].is_spell():
+            self._spells_played += 1
+        super().play_card(game, which)
+        if self._spells_played != 4 or self._used_ability:
+            return
+        self._used_ability = True
+        if self._game_num >= 7:
+            self._game_seven_ability(game)
+            return
+        if self._game_num >= 3:
+            self._game_three_ability(game)
+
+    def _game_three_ability(self, game):
+        game.heroes.choose_hero(game, prompt=f"{self.name} played 4 Spells, choose hero to gain 1💰: ").add_influence(game, 1)
+
+    def _game_seven_ability(self, game):
+        game.log(f"{self.name} played 4 Spells, ALL heroes gain 1💰: ")
+        game.heroes.all_heroes(game, lambda game, hero: hero.add_influence(game, 1))
+
+    def _monster_box_one_ability(self, game):
+        first = game.heroes.choose_hero(game, prompt=f"{self.name} played 4 Spells. Choose first hero to gain 1↯: ")
+        first.add_damage(game, 1)
+        game.heroes.choose_hero(game, prompt="Choose second hero to gain 1↯: ", disallow=first).add_damage(game, 1)
 
 
 class Ron(Hero):
-    def __init__(self):
-        super().__init__("Ron", [
+    def __init__(self, game_num):
+        super().__init__("Ron", game_num, [
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
@@ -557,11 +642,44 @@ class Ron(Hero):
             hogwarts.Item("Every-flavour Beans", "Gain 1💰; for each Ally played, gain 1↯", 0, beans_effect),
             hogwarts.Item("Cleansweep 11", "Gain 1↯; if you defeat a Villain, gain 1💰", 0, broom_effect),
         ])
+        self._damage_assigned = 0
+        self._used_ability = False
+
+    def assign_damage(self, game):
+        villain = super().assign_damage(game)
+        if villain is None:
+            return
+        self._damage_assigned += 1
+        if self._damage_assigned != 3 or self._used_ability:
+            return
+        self._used_ability = True
+        if self._game_num >= 7:
+            self._game_seven_ability(game)
+            return
+        if self._game_num >= 3:
+            self._game_three_ability(game)
+
+    def play_turn(self, game):
+        self._damage_assigned = 0
+        self._used_ability = False
+        super().play_turn(game)
+
+    def _game_three_ability(self, game):
+        game.log(f"{self.name} assigned 3 or more ↯, one hero gains 2💜")
+        game.heroes.choose_hero(game, prompt="Choose hero to gain 2💜: ").add_health(game, 2)
+
+    def _game_seven_ability(self, game):
+        game.log(f"{self.name} assigned 3 or more ↯, all heroes gain 2💜")
+        game.heroes.all_heroes(game, lambda game, hero: hero.add_health(game, 2))
+
+    def _monster_box_one_ability(self, game):
+        game.log(f"{self.name} assigned 3 or more ↯/💰, all heroes gain 1💜")
+        game.heroes.all_heroes(game, lambda game, hero: hero.add_health(game, 1))
 
 
 class Harry(Hero):
-    def __init__(self):
-        super().__init__("Harry", [
+    def __init__(self, game_num):
+        super().__init__("Harry", game_num, [
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
@@ -573,11 +691,40 @@ class Harry(Hero):
             hogwarts.Item("Invisibility cloak", "Gain 1💰; if in hand, take only 1↯ from each Villain or Dark Arts", 0, lambda game: game.heroes.active_hero.add_influence(game)),
             hogwarts.Item("Firebolt", "Gain 1↯; if you defeat a Villain, gain 1💰", 0, broom_effect),
         ])
+        self._used_ability = False
+
+    def control_callback(self, game, amount):
+        if amount > -1:
+            return
+        if self._game_num >= 7:
+            self._game_seven_ability_control_callback(game, amount)
+            return
+        if self._game_num >= 3:
+            self._game_three_ability_control_callback(game, amount)
+        self._used_ability = True
+
+    def _game_three_ability_control_callback(self, game, amount):
+        if self._used_ability:
+            return
+        game.heroes.choose_hero(game, prompt=f"{self.name}: first 💀 removed this turn, choose hero to gain 1↯: ").add_damage(game, 1)
+
+    def _game_seven_ability_control_callback(self, game, amount):
+        if self._used_ability:
+            return
+        game.log(f"{self.name}: first 💀 removed this turn, two heroes gain 1↯")
+        first = game.heroes.choose_hero(game, prompt="Choose first hero to gain 1↯: ")
+        first.add_damage(game, 1)
+        game.heroes.choose_hero(game, prompt="Choose second hero to gain 1↯: ", disallow=first, disallow_msg="You already chose {}!").add_damage(game, 1)
+
+    def _monster_box_one_ability_control_callback(self, game, amount):
+        game.log(f"{self.name}: 💀 removed, ALL heroes gain 1💜 for each")
+        for _ in range(amount):
+            game.heroes.all_heroes(game, lambda game, hero: hero.add_health(game, 1))
 
 
 class Neville(Hero):
-    def __init__(self):
-        super().__init__("Neville", [
+    def __init__(self, game_num):
+        super().__init__("Neville", game_num, [
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
@@ -589,11 +736,53 @@ class Neville(Hero):
             hogwarts.Item("Remembrall", "Gain 1💰; if discarded, gain 2💰", 0, lambda game: game.heroes.active_hero.add_influence(game), discard_effect=lambda game, hero: hero.add_influence(game, 2)),
             hogwarts.Item("Mandrake", "Gain 1↯, or one hero gains 2💜", 0, mandrake_effect),
         ])
+        self._healed_heroes = set()
+
+    def health_callback(self, game, hero, amount):
+        if self._game_num >= 7:
+            self._game_seven_ability_healing_callback(game, hero, amount)
+            return
+        if self._game_num >= 3:
+            self._game_three_ability_healing_callback(game, hero, amount)
+
+    def _game_three_ability_healing_callback(self, game, hero, amount):
+        if hero in self._healed_heroes:
+            return
+        if amount < 1:
+            return
+        self._healed_heroes.add(hero)
+        game.log(f"First time Neville healed {hero.name} this turn, {hero.name} gets an extra 💜")
+        hero.add_health(game, 1)
+
+    def _game_seven_ability_healing_callback(self, game, hero, amount):
+        if amount < 1:
+            return
+        game.log(f"Neville healed {hero.name}, {hero.name} gets an extra 💜")
+        hero.add_health(game, 1)
+
+    def _monster_box_one_ability_healing_callback(self, game, hero, amount):
+        if hero in self._healed_heroes:
+            return
+        if amount < 1:
+            return
+        self._healed_heroes.add(hero)
+        game.log(f"First time Neville healed {hero.name} this turn, {hero.name} gets an extra 💜 or 💰")
+        match game.input("Choose effect: (h)💜, (i)💰: ", "hi"):
+            case "h":
+                hero.add_health(game, 1)
+            case "i":
+                hero.add_influence(game, 1)
+
+    def play_turn(self, game):
+        self._healed_heroes = set()
+        game.heroes.add_health_callback(game, self)
+        super().play_turn(game)
+        game.heroes.remove_health_callback(game, self)
 
 
 class Ginny(Hero):
-    def __init__(self):
-        super().__init__("Ginny", [
+    def __init__(self, game_num):
+        super().__init__("Ginny", game_num, [
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
@@ -605,11 +794,29 @@ class Ginny(Hero):
             hogwarts.Item("Nimbus 2000", "Gain 1↯; if you defeat a Villian, gain 1💰", 0, broom_effect),
             hogwarts.Spell("Bat Bogey Hex", "Gain 1↯, or ALL heroes gain 1💜", 0, bat_bogey_effect),
         ])
+        self._villains_damaged = set()
+        self._used_ability = False
+
+    def assign_damage(self, game):
+        villain = super().assign_damage(game)
+        if villain is None:
+            return
+        self._villains_damaged.add(villain)
+        if self._game_num < 3 or len(self._villains_damaged) != 2 or self._used_ability:
+            return
+        self._used_ability = True
+        game.log(f"{self.name} assigned ↯/💰 to 2 or more villains, ALL heroes gain 1💰")
+        game.heroes.all_heroes(game, lambda game, hero: hero.add_influence(game, 1))
+
+    def play_turn(self, game):
+        self._villains_damaged = set()
+        self._used_ability = False
+        super().play_turn(game)
 
 
 class Luna(Hero):
-    def __init__(self):
-        super().__init__("Luna", [
+    def __init__(self, game_num):
+        super().__init__("Luna", game_num, [
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
@@ -621,6 +828,19 @@ class Luna(Hero):
             hogwarts.Item("Spectrespecs", "Gain 1💰; you may reveal the top Dark Arts and choose to discard it", 0, spectrespecs_effect),
             hogwarts.Item("Lion Hat", "Gain 1💰; if another hero has broom or quidditch gear, gain 1↯", 0, lion_hat_effect),
         ])
+        self._used_ability = False
+
+    def draw(self, game, count=1, end_of_turn=False):
+        cards_before = len(self._hand)
+        super().draw(game, count, end_of_turn)
+        if not end_of_turn and self._game_num >= 3 and len(self._hand) > cards_before and not self._used_ability:
+            game.heroes.choose_hero(game, prompt=f"{self.name} drew first extra card, choose hero to gain 2💜: ").add_health(game, 2)
+            self._used_ability = True
+
+    def play_turn(self, game):
+        self._used_ability = False
+        super().play_turn(game)
+
 
 HEROES = {
     "Hermione": Hermione,

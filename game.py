@@ -49,6 +49,9 @@ class Game(object):
         self._active_hero = 0
         self.heroes.all_heroes(self, lambda game, hero: hero.draw(game, 5, True))
 
+        if self.heroes._harry:
+            self.locations.add_control_callback(self, self.heroes._harry)
+
     def input(self, message, valid_choices=None):
         if isinstance(valid_choices, range):
             valid_choices = [str(i) for i in valid_choices]
@@ -104,13 +107,14 @@ class Game(object):
         self.log("-----Turn start-----")
         self.dark_arts_deck.play_turn(self)
         self.villain_deck.play_turn(self)
-        self.heroes.active_hero.play_turn(self)
+        self.heroes.play_turn(self)
 
         self.log("-----Cleanup phase-----")
         self.dark_arts_deck.end_turn()
         self.hogwarts_deck.refill_market()
         self.villain_deck.reveal(self)
         self.heroes.all_heroes(self, lambda game, hero: hero.recover_from_stun(game))
+        self.heroes.active_hero.end_turn(self)
 
         self.log("-----Turn end-----")
         self.heroes.next()

@@ -78,8 +78,10 @@ class Location(object):
         self._control += amount
         if self._control > self._control_max:
             self._control = self._control_max
+            game.log(f"{self.name} is full of 💀! Only added {self._control - control_start}💀")
         if self._control < 0:
             self._control = 0
+            game.log(f"{self.name} is empty of 💀! Only added {self._control - control_start}💀")
         if self._control != control_start:
             for callback in callbacks:
                 callback.control_callback(game, self._control - control_start)
@@ -106,7 +108,18 @@ game_three_locations = [
 ]
 
 def graveyard_effect(game):
-    pass
+    allies = sum(1 for card in hero._hand if card.is_ally())
+    if allies == 0:
+        game.log(f"{hero.name} has no allies to discard, safe!")
+        return
+    while True:
+        choice = int(game.input(f"Choose an ally for {hero.name} to discard: ", range(len(hero._hand))))
+        card = hero._hand[choice]
+        if not card.is_ally():
+            game.log(f"{card.name} is not an ally!")
+            continue
+        hero.discard(game, choice)
+        break
 
 game_four_locations = [
     Location("Quidditch World Cup", 1, 6),

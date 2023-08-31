@@ -60,7 +60,7 @@ class DarkArtsCard(object):
         self.effect = effect
 
     def play(self, game):
-        game.log(f"Playing {self.name} card: {self.description}")
+        game.log(f"Playing {self.name} dark arts card: {self.description}")
         self.effect(game)
 
 
@@ -154,18 +154,29 @@ game_two_cards = [
 ]
 
 def kiss_effect(game):
-    pass
+    active_hero = game.heroes.active_hero
+    active_hero.remove_health(game, 2)
+    game.heroes.all_heroes(game, lambda game, hero: hero.remove_health(game, 1), skip_active=True)
 
-def opugno_effect(game):
-    pass
+def opugno_effect(game, hero):
+    card = hero.reveal_top_card(game)
+    if card is None:
+        game.log(f"{hero.name} has no cards left to reveal")
+        return
+    game.log(f"{hero.name} revealed {card}")
+    if card.cost >= 1:
+        hero.discard_top_card(game)
+        hero.remove_health(game, 2)
 
 def tarantallegra_effect(game):
-    pass
+    hero = game.heroes.active_hero
+    hero.remove_health(game, 1)
+    hero.allow_only_one_damage(game)
 
 game_three_cards = [
     DarkArtsCard("Dementor's Kiss", "Active hero loses 2💜, others lose 1💜", kiss_effect),
     DarkArtsCard("Dementor's Kiss", "Active hero loses 2💜, others lose 1💜", kiss_effect),
-    DarkArtsCard("Opugno", "ALL heroes reveal top card, if it costs 1💰 or more discard it and lose 2💜", opugno_effect),
+    DarkArtsCard("Opugno", "ALL heroes reveal top card, if it costs 1💰 or more discard it and lose 2💜", lambda game: game.heroes.all_heroes(game, opugno_effect)),
     DarkArtsCard("Tarantallegra", "Active hero loses 1💜 and cannot assign more than 1↯ to each Villain", tarantallegra_effect),
 ]
 
@@ -174,16 +185,15 @@ def morsmordre_effect(game):
     death_eaters = sum(1 for v in game.villain_deck.current if v.name == "Death Eater")
     game.heroes.all_heroes(game, lambda game, hero: hero.remove_health(game, 1 + death_eaters))
 
-def regeneration_effect(game):
-    game.villain_deck.all_villains(game, lambda game, villain: villain.remove_damage(game, 2))
-
 def imperio_effect(game):
-    game.heroes.choose_hero(game, "Choose hero to lose 2💜: ", allow_active=False).remove_health(game, 2)
+    game.heroes.choose_hero(game, prompt="Choose hero to lose 2💜: ", disallow=game.heroes.active_hero,
+                            disallow_msg="Active hero cannot be chosen!").remove_health(game, 2)
     game.dark_arts_deck.play(game, 1)
 
 def avada_kedavra_effect(game):
+    was_stunned = game.heroes.active_hero.is_stunned()
     game.heroes.active_hero.remove_health(game, 3)
-    if game.heroes.active_hero.is_stunned():
+    if not was_stunned and game.heroes.active_hero.is_stunned():
         game.log("Stunned by Avada Kedavra! Adding another 💀")
         game.locations.add_control(game)
     game.dark_arts_deck.play(game, 1)
@@ -210,7 +220,7 @@ def crucio_effect(game):
 game_four_cards = [
     DarkArtsCard("Morsmordre", "ALL heroes lose 1💜, add 1💀", morsmordre_effect),
     DarkArtsCard("Morsmordre", "ALL heroes lose 1💜, add 1💀", morsmordre_effect),
-    DarkArtsCard("Regeneration", "Remove 2↯ from ALL Villains", regeneration_effect),
+    DarkArtsCard("Regeneration", "Remove 2↯ from ALL Villains", lambda game: game.villain_deck.all_villains(game, lambda game, villain: villain.remove_damage(game, 2))),
     DarkArtsCard("Imperio", "Choose another hero to lose 2💜; reveal another card", imperio_effect),
     DarkArtsCard("Avada Kedavra", "Active hero loses 3💜, if stun add +1💀; reveal another card", avada_kedavra_effect),
     DarkArtsCard("Heir of Slytherin", "Roll the Slytherin die", heir_of_slytherin_effect),
