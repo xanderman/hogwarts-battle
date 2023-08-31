@@ -65,8 +65,11 @@ class Game(object):
                 if key == "KEY_UP":
                     self.scroll_log_up()
                     continue
-                elif key == "KEY_DOWN":
+                if key == "KEY_DOWN":
                     self.scroll_log_down()
+                    continue
+                if key == " ":
+                    self.scroll_log_to_bottom()
                     continue
                 if key in valid_choices:
                     break
@@ -82,15 +85,22 @@ class Game(object):
         self._log_pad.addstr(message, attr)
         self._last_log_line = min(self._last_log_line + 1, 1000)
         self._last_shown_log_line = self._last_log_line
-        self._log_pad.refresh(max(self._last_shown_log_line - self._log_lines_to_show, 0),0, self._log_start_line,self._log_start_col, self._log_end_line,self._log_end_col)
+        self._refresh_log()
 
     def scroll_log_up(self):
         if max(self._last_shown_log_line - self._log_lines_to_show, 0) != 0:
             self._last_shown_log_line -= 1
-        self._log_pad.refresh(max(self._last_shown_log_line - self._log_lines_to_show, 0),0, self._log_start_line,self._log_start_col, self._log_end_line,self._log_end_col)
+        self._refresh_log()
 
     def scroll_log_down(self):
         self._last_shown_log_line = min(self._last_log_line, self._last_shown_log_line + 1)
+        self._refresh_log()
+
+    def scroll_log_to_bottom(self):
+        self._last_shown_log_line = self._last_log_line
+        self._refresh_log()
+
+    def _refresh_log(self):
         self._log_pad.refresh(max(self._last_shown_log_line - self._log_lines_to_show, 0),0, self._log_start_line,self._log_start_col, self._log_end_line,self._log_end_col)
 
     def display_state(self):
