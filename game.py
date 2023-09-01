@@ -163,7 +163,7 @@ class Game(object):
             self.heroes.all_heroes(self, lambda game, hero: hero.add_health(game, 1))
         elif die_result == "🃏":
             self.log("Rolled 🃏, ALL heroes draw a card")
-            self.heroes.all_heroes(self, lambda hero: hero.draw(game))
+            self.heroes.all_heroes(self, lambda game, hero: hero.draw(game))
 
 
 def main(stdscr, game_num, hero_names):
