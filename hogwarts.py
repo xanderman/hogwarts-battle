@@ -2,6 +2,7 @@ from collections import defaultdict
 from functools import reduce
 
 import curses
+import itertools
 import operator
 import random
 
@@ -24,12 +25,23 @@ class HogwartsDeck(object):
             card.display_state(self._window, 2*i+1, i, count)
         self._window.refresh()
 
-    def refill_market(self):
+    def refill_market(self, game):
         while len(self._market) < self._max:
             if len(self._deck) == 0:
                 break
             card = self._deck.pop()
+            game.log(f"Adding {card.name} to market")
             self._market[card.name].append(card)
+
+    def empty_market(self, game):
+        for card in itertools.chain.from_iterable(self._market.values()):
+            self._deck.insert(0, card)
+        self._market.clear()
+
+    def empty_market_slot(self, game, slot):
+        for card in self._market[slot]:
+            self._deck.insert(0, card)
+        del self._market[slot]
 
     def __getitem__(self, pos):
         if pos not in range(len(self._market)):
@@ -186,7 +198,7 @@ def polyjuice_effect(game):
         played_allies[0].effect(game)
         return
     while True:
-        choice = int(game.input("Choose played ally to polyjuice: "), range(len(game.heroes.active_hero._play_area)))
+        choice = int(game.input("Choose played ally to polyjuice: ", range(len(game.heroes.active_hero._play_area))))
         card = game.heroes.active_hero._play_area[choice]
         if not card.is_ally():
             game.log("{card.name} is not an ally!")
@@ -308,7 +320,7 @@ def accio_effect(game):
         game.log(f"{hero.name} has no items in discard, gaining 2💰")
         hero.add_influence(game, 2)
         return
-    game.log(f"Items in {hero.name}'s discard: {items_str}")
+    game.log(f"Items in {hero.name}'s discard: ")
     for i, item in enumerate(items):
         game.log(f" {i}: {item}")
     choices = ['i'] + [str(i) for i in range(len(items))]
@@ -357,7 +369,7 @@ class FleurDelacour(Ally):
         self._used_ability = False
         game.heroes.active_hero.add_influence(game, 2)
         for card in game.heroes.active_hero._play_area:
-            if card.is_ally():
+            if card.is_ally() and not card.name == "Fleur Delacour":
                 game.heroes.active_hero.add_health(game, 2)
                 return
         game.heroes.active_hero.add_extra_card_effect(game, self.__extra_effect)

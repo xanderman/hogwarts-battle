@@ -45,7 +45,7 @@ class Game(object):
         self._log_pad.scrollok(True)
 
         self.villain_deck.reveal(self)
-        self.hogwarts_deck.refill_market()
+        self.hogwarts_deck.refill_market(self)
         self._active_hero = 0
         self.heroes.all_heroes(self, lambda game, hero: hero.draw(game, 5, True))
 
@@ -99,6 +99,7 @@ class Game(object):
     def scroll_log_to_bottom(self):
         self._last_shown_log_line = self._last_log_line
         self._refresh_log()
+        self.display_state()
 
     def _refresh_log(self):
         self._log_pad.refresh(max(self._last_shown_log_line - self._log_lines_to_show, 0),0, self._log_start_line,self._log_start_col, self._log_end_line,self._log_end_col)
@@ -120,11 +121,11 @@ class Game(object):
         self.heroes.play_turn(self)
 
         self.log("-----Cleanup phase-----")
-        self.dark_arts_deck.end_turn()
-        self.hogwarts_deck.refill_market()
-        self.villain_deck.reveal(self)
         self.heroes.all_heroes(self, lambda game, hero: hero.recover_from_stun(game))
+        self.dark_arts_deck.end_turn()
+        self.villain_deck.reveal(self)
         self.heroes.active_hero.end_turn(self)
+        self.hogwarts_deck.refill_market(self)
 
         self.log("-----Turn end-----")
         self.heroes.next()
@@ -162,7 +163,7 @@ class Game(object):
             self.heroes.all_heroes(self, lambda game, hero: hero.add_health(game, 1))
         elif die_result == "🃏":
             self.log("Rolled 🃏, ALL heroes draw a card")
-            self.heroes.all_heroes(game, lambda hero: hero.draw(game))
+            self.heroes.all_heroes(self, lambda hero: hero.draw(game))
 
 
 def main(stdscr, game_num, hero_names):

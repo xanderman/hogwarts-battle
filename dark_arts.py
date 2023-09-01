@@ -181,9 +181,11 @@ game_three_cards = [
 ]
 
 def morsmordre_effect(game):
-    game.locations.add_control(game)
     death_eaters = sum(1 for v in game.villain_deck.current if v.name == "Death Eater")
+    if death_eaters > 0:
+        game.log(f"Damage increased to {death_eaters+1}💜 by Death Eater(s)")
     game.heroes.all_heroes(game, lambda game, hero: hero.remove_health(game, 1 + death_eaters))
+    game.locations.add_control(game)
 
 def imperio_effect(game):
     game.heroes.choose_hero(game, prompt="Choose hero to lose 2💜: ", disallow=game.heroes.active_hero,
@@ -191,9 +193,9 @@ def imperio_effect(game):
     game.dark_arts_deck.play(game, 1)
 
 def avada_kedavra_effect(game):
-    was_stunned = game.heroes.active_hero.is_stunned()
+    was_stunned = game.heroes.active_hero.is_stunned(game)
     game.heroes.active_hero.remove_health(game, 3)
-    if not was_stunned and game.heroes.active_hero.is_stunned():
+    if not was_stunned and game.heroes.active_hero.is_stunned(game):
         game.log("Stunned by Avada Kedavra! Adding another 💀")
         game.locations.add_control(game)
     game.dark_arts_deck.play(game, 1)
@@ -208,7 +210,7 @@ def heir_of_slytherin_effect(game):
         game.locations.add_control(game)
     elif die_result == "💜":
         game.log("Rolled 💜, ALL Villains remove one ↯")
-        game.villain_deck.all_villains(lambda game, villain: villain.remove_damage(game, 1))
+        game.villain_deck.all_villains(game, lambda game, villain: villain.remove_damage(game, 1))
     elif die_result == "🃏":
         game.log("Rolled 🃏, ALL heroes discard a card")
         game.heroes.all_heroes(game, lambda game, hero: hero.choose_and_discard(game))

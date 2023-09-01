@@ -54,14 +54,14 @@ class Heroes(object):
     def previous_hero(self):
         return self._heroes[(self._current - 1) % len(self._heroes)]
 
-    def choose_hero(self, game, prompt="Choose a hero: ", disallow=None, dissallow_msg="{} cannot be chosen!"):
+    def choose_hero(self, game, prompt="Choose a hero: ", disallow=None, disallow_msg="{} cannot be chosen!"):
         if len(self._heroes) == 1:
             return self._heroes[0]
 
         while True:
             chosen = self._heroes[int(game.input(prompt, range(len(self._heroes))))]
             if chosen == disallow:
-                game.log(dissallow_msg.format(disallow.name))
+                game.log(disallow_msg.format(disallow.name))
                 continue
             return chosen
 
@@ -151,6 +151,7 @@ class Hero(object):
         self._discard = starting_deck
         self._damage_tokens = 0
         self._influence_tokens = 0
+        self._cards_acquired = 0
         self._acquire_callbacks = []
         self._discard_callbacks = []
         self._health_callbacks = []
@@ -337,6 +338,7 @@ class Hero(object):
         self._only_one_damage = True
 
     def _acquire(self, game, card, top_of_deck=False):
+        self._cards_acquired += 1
         if top_of_deck:
             self._deck.append(card)
         else:
@@ -388,7 +390,9 @@ class Hero(object):
         if choice == "c":
             return
         if choice == "a":
-            while len(self._hand) > 0:
+            # Get length first, so we don't play cards that get added to hand
+            num_to_play = len(self._hand)
+            for _ in range(num_to_play):
                 self.play_card(game, 0)
         else:
             self.play_card(game, int(choice))
@@ -471,11 +475,24 @@ class Hero(object):
                     game.log("Invalid action!")
 
     def end_turn(self, game):
+        if self._cards_acquired == 0 and len(game.hogwarts_deck._market) >= 0:
+            choices = ['a', 'c'] + [str(i) for i in range(len(game.hogwarts_deck._market))]
+            choice = game.input(f"{self.name} didn't acquire any cards, choose market slot to empty, (a)ll, or (c)ancel: ", choices)
+            if choice == "c":
+                pass
+            elif choice == "a":
+                game.log("Recycling entire market")
+                game.hogwarts_deck.empty_market(game)
+            else:
+                choice = game.hogwarts_deck[int(choice)]
+                game.log(f"Recycling {choice}")
+                game.hogwarts_deck.empty_market_slot(game, choice.name)
         self._discard += self._hand + self._play_area
         self._hand = []
         self._play_area = []
         self._damage_tokens = 0
         self._influence_tokens = 0
+        self._cards_acquired = 0
         game.heroes.allow_drawing(game)
         game.heroes.allow_healing(game)
         self._can_put_allies_in_deck = False
@@ -490,11 +507,11 @@ class Hero(object):
 def base_ally_effect(game):
     hero = game.heroes.active_hero
     if hero._health == hero._max_health:
-        game.log("{hero.name} is already at max health, gaining 1↯")
+        game.log(f"{hero.name} is already at max health, gaining 1↯")
         hero.add_damage(game, 1)
         return
     if not hero.healing_allowed:
-        game.log("{hero.name} can't heal, gaining 1↯")
+        game.log(f"{hero.name} can't heal, gaining 1↯")
         hero.add_damage(game, 1)
         return
     match game.input("Choose effect: (d)↯, (h)💜: ", "dh"):

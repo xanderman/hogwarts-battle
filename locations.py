@@ -25,7 +25,7 @@ class Locations(object):
             attr = curses.A_BOLD | curses.color_pair(1) if i == self._current else curses.A_NORMAL
             self._window.addstr(row, 1, str(location), attr)
             row += 1
-            if location.desc:
+            if location.desc != "":
                 self._window.addstr(row, 1, f"  Reveal: {location.desc}", attr)
                 row += 1
         self._window.box()
@@ -58,7 +58,7 @@ class Locations(object):
 
 
 class Location(object):
-    def __init__(self, name, dark_arts_count, control_max, desc=None, reveal_effect=lambda game: None):
+    def __init__(self, name, dark_arts_count, control_max, desc="", reveal_effect=lambda game: None):
         self.name = name
         self.dark_arts_count = dark_arts_count
         self._control_max = control_max
@@ -71,17 +71,19 @@ class Location(object):
         return f"{self.name} ({self._control}/{self._control_max}💀), {self.dark_arts_count} dark arts"
 
     def _reveal(self, game):
+        game.log(f"Moving to location {self.name}! {self.desc}")
         self._reveal_effect(game)
 
     def _add_control(self, game, amount, callbacks):
         control_start = self._control
         self._control += amount
+        action = "added" if amount > 0 else "removed"
         if self._control > self._control_max:
             self._control = self._control_max
-            game.log(f"{self.name} is full of 💀! Only added {self._control - control_start}💀")
+            game.log(f"{self.name} is full of 💀! Only {action} {self._control - control_start}💀")
         if self._control < 0:
             self._control = 0
-            game.log(f"{self.name} is empty of 💀! Only added {self._control - control_start}💀")
+            game.log(f"{self.name} is empty of 💀! Only {action} {self._control - control_start}💀")
         if self._control != control_start:
             for callback in callbacks:
                 callback.control_callback(game, self._control - control_start)
@@ -107,7 +109,7 @@ game_three_locations = [
     Location("Shrieking Shack", 2, 6),
 ]
 
-def graveyard_effect(game):
+def graveyard_effect(game, hero):
     allies = sum(1 for card in hero._hand if card.is_ally())
     if allies == 0:
         game.log(f"{hero.name} has no allies to discard, safe!")
@@ -124,25 +126,47 @@ def graveyard_effect(game):
 game_four_locations = [
     Location("Quidditch World Cup", 1, 6),
     Location("Triwizard Tournament", 2, 6),
-    Location("Graveyard", 2, 7, "ALL heroes discard an ally", graveyard_effect),
+    Location("Graveyard", 2, 7, "ALL heroes discard an ally", lambda game: game.heroes.all_heroes(graveyard_effect)),
 ]
 
-def ministry_effect(game):
-    pass
+def ministry_effect(game, hero):
+    spells = sum(1 for card in hero._hand if card.is_spell())
+    if spells == 0:
+        game.log(f"{hero.name} has no spells to discard, safe!")
+        return
+    while True:
+        choice = int(game.input(f"Choose a spell for {hero.name} to discard: ", range(len(hero._hand))))
+        card = hero._hand[choice]
+        if not card.is_ally():
+            game.log(f"{card.name} is not a spell!")
+            continue
+        hero.discard(game, choice)
+        break
 
 game_five_locations = [
     Location("Azkaban", 1, 7),
     Location("Hall of Prophecy", 2, 7),
-    Location("Ministry of Magic", 2, 7, "ALL heroes discard a spell", ministry_effect),
+    Location("Ministry of Magic", 2, 7, "ALL heroes discard a spell", lambda game: game.heroes.all_heroes(ministry_effect)),
 ]
 
-def tower_effect(game):
-    pass
+def tower_effect(game, hero):
+    items = sum(1 for card in hero._hand if card.is_item())
+    if items == 0:
+        game.log(f"{hero.name} has no items to discard, safe!")
+        return
+    while True:
+        choice = int(game.input(f"Choose an item for {hero.name} to discard: ", range(len(hero._hand))))
+        card = hero._hand[choice]
+        if not card.is_ally():
+            game.log(f"{card.name} is not an item!")
+            continue
+        hero.discard(game, choice)
+        break
 
 game_six_locations = [
     Location("Knockturn Alley", 1, 7),
     Location("The Burrow", 2, 7),
-    Location("Astronomy Tower", 3, 8, "ALL heroes discard an item", tower_effect),
+    Location("Astronomy Tower", 3, 8, "ALL heroes discard an item", lambda game: game.heroes.all_heroes(tower_effect)),
 ]
 
 def castle_effect(game):
