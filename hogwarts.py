@@ -151,6 +151,19 @@ def reparo_effect(game):
         case _:
             raise ValueError("Programmer Error! Invalid choice!")
 
+def dittany_effect(game):
+    if not game.heroes.healing_allowed:
+        game.log("Healing not allowed, ignoring Essence of Dittany effect")
+        return
+    while True:
+        choice = int(game.input("Choose hero to gain 2💜: ", range(len(game.heroes))))
+        hero = game.heroes[choice]
+        if not hero.healing_allowed:
+            game.log(f"{hero.name} cannot heal, choose another hero!")
+            continue
+        hero.add_health(game, 2)
+        break
+
 def oliver_effect(game):
     game.heroes.active_hero.add_damage(game)
     game.heroes.active_hero.add_extra_villain_reward(game, lambda game: game.heroes.choose_hero(game, prompt="Choose hero to gain 2💜: ").add_health(game, 2))
@@ -173,10 +186,10 @@ game_one_cards = [
     Spell("Incendio", "Gain 1↯ and draw a card", 4, lambda game: game.heroes.active_hero.add(game, damage=1, cards=1)),
     Spell("Descendo", "Gain 2↯", 5, lambda game: game.heroes.active_hero.add_damage(game, 2)),
     Spell("Descendo", "Gain 2↯", 5, lambda game: game.heroes.active_hero.add_damage(game, 2)),
-    Item("Essence of Dittany", "Any hero gains 2💜", 2, lambda game: game.heroes.choose_hero(game, prompt="Choose hero to gain 2💜: ").add_health(game, 2)),
-    Item("Essence of Dittany", "Any hero gains 2💜", 2, lambda game: game.heroes.choose_hero(game, prompt="Choose hero to gain 2💜: ").add_health(game, 2)),
-    Item("Essence of Dittany", "Any hero gains 2💜", 2, lambda game: game.heroes.choose_hero(game, prompt="Choose hero to gain 2💜: ").add_health(game, 2)),
-    Item("Essence of Dittany", "Any hero gains 2💜", 2, lambda game: game.heroes.choose_hero(game, prompt="Choose hero to gain 2💜: ").add_health(game, 2)),
+    Item("Essence of Dittany", "Any hero gains 2💜", 2, dittany_effect),
+    Item("Essence of Dittany", "Any hero gains 2💜", 2, dittany_effect),
+    Item("Essence of Dittany", "Any hero gains 2💜", 2, dittany_effect),
+    Item("Essence of Dittany", "Any hero gains 2💜", 2, dittany_effect),
     Item("Quidditch Gear", "Gain 1↯ and 1💜", 3, lambda game: game.heroes.active_hero.add(game, damage=1, hearts=1)),
     Item("Quidditch Gear", "Gain 1↯ and 1💜", 3, lambda game: game.heroes.active_hero.add(game, damage=1, hearts=1)),
     Item("Quidditch Gear", "Gain 1↯ and 1💜", 3, lambda game: game.heroes.active_hero.add(game, damage=1, hearts=1)),
@@ -184,7 +197,7 @@ game_one_cards = [
     Item("Sorting Hat", "Gain 2💰, may put acquired Allies on top of deck", 4, sorting_hat_effect),
     Item("Golden Snitch", "Gain 2💰 and draw a card", 5, lambda game: game.heroes.active_hero.add(game, influence=2, cards=1)),
     Ally("Oliver Wood", "Gain 1↯, if you defeat a Villain anyone gains 2💜", 3, oliver_effect),
-    Ally("Rebeus Hagrid", "Gain 1↯; ALL heroes gain 1💜", 4, hagrid_effect),
+    Ally("Rubeus Hagrid", "Gain 1↯; ALL heroes gain 1💜", 4, hagrid_effect),
     Ally("Albus Dumbledore", "ALL heroes gain 1↯, 1💰, 1💜, and draw a card", 8, lambda game: game.heroes.all_heroes(game, lambda game, hero: hero.add(game, damage=1, influence=1, hearts=1, cards=1))),
 ]
 
@@ -267,6 +280,9 @@ def petrificus_effect(game):
     game.villain_deck.current[int(choice)].stun(game)
 
 def butterbeer_effect(game):
+    if len(game.heroes) <= 2:
+        game.heroes.all_heroes(game, lambda game, hero: hero.add(game, influence=1, hearts=1))
+        return
     first = game.heroes.choose_hero(game, prompt="Choose first hero for butterbeer: ")
     first.add(game, influence=1, hearts=1)
     game.heroes.choose_hero(game, prompt="Choose second hero for butterbeer: ", disallow=first, disallow_msg="You already chose {}!").add(game, influence=1, hearts=1)
@@ -299,9 +315,9 @@ game_three_cards = [
     Spell("Expecto Patronum", "Gain 1↯; remove 1💀", 5, patronum_effect),
     Spell("Petrificus Totalus", "Gain 1↯; stun a Villain", 6, petrificus_effect),
     Spell("Petrificus Totalus", "Gain 1↯; stun a Villain", 6, petrificus_effect),
-    Item("Chocolate Frog", "One hero gains 1💰 and 1💜; if discarded, gain 1💰 and 1💜", 2, lambda game: game.heroes.choose_hero(game, prompt="Choose a hero to gain 1💰 and 1💜").add(game, influence=1, hearts=1), discard_effect=lambda game, hero: hero.add(game, influence=1, hearts=1)),
-    Item("Chocolate Frog", "One hero gains 1💰 and 1💜; if discarded, gain 1💰 and 1💜", 2, lambda game: game.heroes.choose_hero(game, prompt="Choose a hero to gain 1💰 and 1💜").add(game, influence=1, hearts=1), discard_effect=lambda game, hero: hero.add(game, influence=1, hearts=1)),
-    Item("Chocolate Frog", "One hero gains 1💰 and 1💜; if discarded, gain 1💰 and 1💜", 2, lambda game: game.heroes.choose_hero(game, prompt="Choose a hero to gain 1💰 and 1💜").add(game, influence=1, hearts=1), discard_effect=lambda game, hero: hero.add(game, influence=1, hearts=1)),
+    Item("Chocolate Frog", "One hero gains 1💰 and 1💜; if discarded, gain 1💰 and 1💜", 2, lambda game: game.heroes.choose_hero(game, prompt="Choose a hero to gain 1💰 and 1💜: ").add(game, influence=1, hearts=1), discard_effect=lambda game, hero: hero.add(game, influence=1, hearts=1)),
+    Item("Chocolate Frog", "One hero gains 1💰 and 1💜; if discarded, gain 1💰 and 1💜", 2, lambda game: game.heroes.choose_hero(game, prompt="Choose a hero to gain 1💰 and 1💜: ").add(game, influence=1, hearts=1), discard_effect=lambda game, hero: hero.add(game, influence=1, hearts=1)),
+    Item("Chocolate Frog", "One hero gains 1💰 and 1💜; if discarded, gain 1💰 and 1💜", 2, lambda game: game.heroes.choose_hero(game, prompt="Choose a hero to gain 1💰 and 1💜: ").add(game, influence=1, hearts=1), discard_effect=lambda game, hero: hero.add(game, influence=1, hearts=1)),
     Item("Butterbeer", "Two heroes gain 1💰 and 1💜", 3, butterbeer_effect),
     Item("Butterbeer", "Two heroes gain 1💰 and 1💜", 3, butterbeer_effect),
     Item("Butterbeer", "Two heroes gain 1💰 and 1💜", 3, butterbeer_effect),
@@ -370,12 +386,14 @@ class FleurDelacour(Ally):
         game.heroes.active_hero.add_influence(game, 2)
         for card in game.heroes.active_hero._play_area:
             if card.is_ally() and not card.name == "Fleur Delacour":
+                game.log(f"Ally {card.name} already played, Fleur adds 2💜")
                 game.heroes.active_hero.add_health(game, 2)
                 return
         game.heroes.active_hero.add_extra_card_effect(game, self.__extra_effect)
 
     def __extra_effect(self, game, card):
         if card.is_ally() and not self._used_ability:
+            game.log(f"Ally {card.name} played, Fleur adds 2💜")
             game.heroes.active_hero.add_health(game, 2)
             self._used_ability = True
 

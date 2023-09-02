@@ -262,6 +262,12 @@ def pettigrew_per_hero(game, hero):
     if len(spells) == 0:
         game.log(f"{hero.name} has no spells in discard")
         return
+    if len(spells) == 1:
+        spell = spells[0]
+        game.log(f"{hero.name} has only one spell in discard, taking {spell}")
+        hero._discard.remove(spell)
+        hero._hand.append(spell)
+        return
     game.log(f"Spells in {hero.name}'s discard:")
     for i, spell in enumerate(spells):
         game.log(f" {i}: {spell}")

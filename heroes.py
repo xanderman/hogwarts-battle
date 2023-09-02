@@ -37,6 +37,12 @@ class Heroes(object):
     def __len__(self):
         return len(self._heroes)
 
+    def __getitem__(self, pos):
+        return self._heroes[pos]
+
+    def __iter__(self):
+        return iter(self._heroes)
+
     def play_turn(self, game):
         if self._harry:
             self._harry._used_ability = False
@@ -251,7 +257,7 @@ class Hero(object):
 
     @property
     def healing_allowed(self):
-        return self._healing_allowed and not self._greyback_present and not self.is_stunned(None)
+        return self._healing_allowed and not self._greyback_present and not self.is_stunned(None) and not self._health == self._max_health
 
     def draw(self, game, count=1, end_of_turn=False):
         if not end_of_turn and not self.drawing_allowed:
@@ -523,7 +529,7 @@ def base_ally_effect(game):
             raise ValueError("Programmer Error! Invalid choice!")
 
 def beedle_effect(game):
-    if len(game.heroes._heroes) == 1:
+    if len(game.heroes) == 1:
         game.log("Only one hero, gaining 2💰")
         choice = "y"
     else:
@@ -547,24 +553,34 @@ def broom_effect(game):
 
 def add_damage_if_ally(game, card):
     if card.is_ally():
-        game.log("Ally {card.name} played, beans add damage")
+        game.log(f"Ally {card.name} played, beans add damage")
         game.heroes.active_hero.add_damage(game)
 
 def beans_effect(game):
     game.heroes.active_hero.add_influence(game)
     for card in game.heroes.active_hero._play_area:
         if card.is_ally():
+            game.log(f"Ally {card.name} already played, beans add damage")
             game.heroes.active_hero.add_damage(game)
     game.heroes.active_hero.add_extra_card_effect(game, add_damage_if_ally)
 
 def mandrake_effect(game):
-    match game.input("Choose effect: (d)↯, (h) one hero gets 2💜: ", "dh"):
-        case "d":
+    if not game.heroes.healing_allowed:
+        game.log(f"Healing not allowed, gaining 1↯")
+        game.heroes.active_hero.add_damage(game, 1)
+        return
+    choices = ['d'] + [str(i) for i in range(len(game.heroes))]
+    while True:
+        choice = game.input("Choose hero to gain 2💜 or (d)↯: ", choices)
+        if choice == "d":
             game.heroes.active_hero.add_damage(game)
-        case "h":
-            game.heroes.choose_hero(game, "Choose hero to gain 2💜: ").add_health(game, 2)
-        case _:
-            raise ValueError("Programmer Error! Invalid choice!")
+            break
+        hero = game.heroes[int(choice)]
+        if not hero.healing_allowed:
+            game.log(f"{hero.name} can't heal, choose another hero!")
+            continue
+        game.heroes[int(choice)].add_health(game, 2)
+        break
 
 def bat_bogey_effect(game):
     match game.input("Choose effect: (d)↯, (h) ALL heroes get 1💜: ", "dh"):
@@ -587,7 +603,7 @@ broom_cards = ["Quidditch Gear", "Cleansweep 11", "Firebolt", "Nimbus 2000", "Ni
 def lion_hat_effect(game):
     game.heroes.active_hero.add_influence(game)
     all_cards = []
-    for hero in game.heroes._heroes:
+    for hero in game.heroes:
         if hero == game.heroes.active_hero:
             continue
         for card in hero._hand:

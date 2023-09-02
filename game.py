@@ -172,7 +172,7 @@ def main(stdscr, game_num, hero_names):
     # For spells
     curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLACK)
     # For allies
-    curses.init_pair(3, curses.COLOR_BLUE, curses.COLOR_BLACK)
+    curses.init_pair(3, curses.COLOR_CYAN, curses.COLOR_BLACK)
     # For items
     curses.init_pair(4, curses.COLOR_YELLOW, curses.COLOR_BLACK)
     game = Game(stdscr, game_num, hero_names)
