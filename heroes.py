@@ -358,7 +358,7 @@ class Hero(object):
         if choice == "c":
             return
         choice = game.hogwarts_deck[int(choice)]
-        game.log(f"Buying {choice}")
+        game.log(f"Buying {choice.name} ({choice.cost}💰; {choice.description})")
         cost = choice.cost
         if self._influence_tokens < cost:
             game.log("Not enough 💰!")

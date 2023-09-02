@@ -1,5 +1,6 @@
 from functools import reduce
 
+import curses
 import operator
 import random
 
