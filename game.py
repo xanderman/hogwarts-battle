@@ -15,6 +15,7 @@ import heroes
 class Game(object):
     def __init__(self, window, game_num, hero_names):
         self._window = window
+        self._window.noutrefresh()
         locations_window = window.subwin(7, curses.COLS // 2, 0, 0)
         self.locations = locations.Locations(locations_window, game_num)
 
@@ -33,6 +34,7 @@ class Game(object):
         self._log_window = window.subwin(curses.LINES - 62, curses.COLS, 62, 0)
         self._log_window.box()
         self._log_window.addstr(0, 1, "Log")
+        self._log_window.noutrefresh()
         beg = self._log_window.getbegyx()
         self._log_start_line = beg[0] + 1
         self._log_start_col = beg[1] + 1
@@ -110,7 +112,7 @@ class Game(object):
         self.villain_deck.display_state()
         self.hogwarts_deck.display_state()
         self.heroes.display_state()
-        self._window.refresh()
+        curses.doupdate()
 
     def play_turn(self):
         self.display_state()
@@ -182,7 +184,7 @@ def main(stdscr, game_num, hero_names):
         except heroes.QuitGame:
             return False
 
-        if len(game.villain_deck.current) == 0:
+        if len(game.villain_deck) == 0:
             return True
 
         if game.locations.is_controlled(game) and not game.locations.advance(game):

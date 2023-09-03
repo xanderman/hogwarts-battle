@@ -3,6 +3,17 @@ import curses
 class Locations(object):
     def __init__(self, window, game_num):
         self._window = window
+        self._window.box()
+        self._window.addstr(0, 1, "Locations")
+        self._window.noutrefresh()
+        beg = self._window.getbegyx()
+        self._pad_start_line = beg[0] + 1
+        self._pad_start_col = beg[1] + 1
+        end = self._window.getmaxyx()
+        self._pad_end_line = self._pad_start_line + end[0] - 3
+        self._pad_end_col = self._pad_start_col + end[1] - 3
+        self._pad = curses.newpad(100, 100)
+
         self._locations = LOCATIONS[game_num]
         self._current = 0
         self._control_callbacks = []
@@ -19,18 +30,13 @@ class Locations(object):
         return self._current < len(self._locations)
 
     def display_state(self):
-        self._window.clear()
-        row = 1
+        self._pad.clear()
         for i, location in enumerate(self._locations):
             attr = curses.A_BOLD | curses.color_pair(1) if i == self._current else curses.A_NORMAL
-            self._window.addstr(row, 1, str(location), attr)
-            row += 1
+            self._pad.addstr(f"{location}\n", attr)
             if location.desc != "":
-                self._window.addstr(row, 1, f"  Reveal: {location.desc}", attr)
-                row += 1
-        self._window.box()
-        self._window.addstr(0, 1, "Locations")
-        self._window.refresh()
+                self._pad.addstr(f"  Reveal: {location.desc}\n", attr)
+        self._pad.noutrefresh(0,0, self._pad_start_line,self._pad_start_col, self._pad_end_line,self._pad_end_col)
 
     def add_control_callback(self, game, callback):
         self._control_callbacks.append(callback)
@@ -137,7 +143,7 @@ def ministry_effect(game, hero):
     while True:
         choice = int(game.input(f"Choose a spell for {hero.name} to discard: ", range(len(hero._hand))))
         card = hero._hand[choice]
-        if not card.is_ally():
+        if not card.is_spell():
             game.log(f"{card.name} is not a spell!")
             continue
         hero.discard(game, choice)
@@ -157,7 +163,7 @@ def tower_effect(game, hero):
     while True:
         choice = int(game.input(f"Choose an item for {hero.name} to discard: ", range(len(hero._hand))))
         card = hero._hand[choice]
-        if not card.is_ally():
+        if not card.is_item():
             game.log(f"{card.name} is not an item!")
             continue
         hero.discard(game, choice)

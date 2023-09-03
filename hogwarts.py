@@ -9,21 +9,29 @@ import random
 class HogwartsDeck(object):
     def __init__(self, window, game_num, market_size=6):
         self._window = window
+        self._window.box()
+        self._window.addstr(0, 1, "Market")
+        self._window.noutrefresh()
+        beg = self._window.getbegyx()
+        self._pad_start_line = beg[0] + 1
+        self._pad_start_col = beg[1] + 1
+        end = self._window.getmaxyx()
+        self._pad_end_line = self._pad_start_line + end[0] - 3
+        self._pad_end_col = self._pad_start_col + end[1] - 3
+        self._pad = curses.newpad(100, 100)
+
         self._deck = reduce(operator.add, CARDS[:game_num])
         self._max = market_size
-
         random.shuffle(self._deck)
         self._market = defaultdict(list)
 
     def display_state(self):
-        self._window.clear()
-        self._window.box()
-        self._window.addstr(0, 1, "Market")
+        self._pad.clear()
         for i, name in enumerate(self._market):
             card = self._market[name][0]
             count = len(self._market[name])
-            card.display_state(self._window, 2*i+1, i, count)
-        self._window.refresh()
+            card.display_state(self._pad, i, count)
+        self._pad.noutrefresh(0,0, self._pad_start_line,self._pad_start_col, self._pad_end_line,self._pad_end_col)
 
     def refill_market(self, game):
         while len(self._market) < self._max:
@@ -66,11 +74,11 @@ class HogwartsCard(object):
         self.effect = effect
         self.discard_effect = discard_effect
 
-    def display_state(self, window, row, i, count):
-        window.addstr(row  , 1, f"{i}: ", curses.A_BOLD)
+    def display_state(self, window, i, count):
+        window.addstr(f"{i}: ", curses.A_BOLD)
         self.display_name(window, curses.A_BOLD)
-        window.addstr(f" x{count}", curses.color_pair(1) | curses.A_BOLD)
-        window.addstr(row+1, 1, f"     {self.description}")
+        window.addstr(f" x{count}\n", curses.color_pair(1) | curses.A_BOLD)
+        window.addstr(f"     {self.description}\n")
 
     def display_name(self, window, attr=0):
         window.addstr(self.name, self.color | attr)
@@ -259,9 +267,9 @@ game_two_cards = [
     Ally("Fawkes", "Gain 2↯ or ALL heroes gain 2💜", 5, fawkes_effect),
     Ally("Molly Weasley", "ALL heroes gain 1💰 and 2💜", 6, lambda game: game.heroes.all_heroes(game, lambda game, hero: hero.add(game, influence=1, hearts=2))),
     Ally("Dobby", "Remove 1💀 and draw a card", 4, dobby_effect),
-    Ally("Arthur Weasly", "ALL heroes gain 2💰", 6, lambda game: game.heroes.all_heroes(game, lambda game, hero: hero.add_influence(game, 2))),
+    Ally("Arthur Weasley", "ALL heroes gain 2💰", 6, lambda game: game.heroes.all_heroes(game, lambda game, hero: hero.add_influence(game, 2))),
     Ally("Gilderoy Lockhart", "Draw a card, then discard a card; if discarded, draw a card", 2, lockhart_effect, discard_effect=lambda game, hero: hero.draw(game)),
-    Ally("Ginny Weasly", "Gain 1↯ and 1💰", 4, lambda game: game.heroes.active_hero.add(game, damage=1, influence=1)),
+    Ally("Ginny Weasley", "Gain 1↯ and 1💰", 4, lambda game: game.heroes.active_hero.add(game, damage=1, influence=1)),
 ]
 
 def patronum_effect(game):
@@ -270,14 +278,14 @@ def patronum_effect(game):
 
 def petrificus_effect(game):
     game.heroes.active_hero.add_damage(game)
-    if len(game.villain_deck.current) == 0:
+    if len(game.villain_deck.choices) == 0:
         game.log("No villains to stun!")
         return
-    choices = ['c'] + [str(i) for i in range(len(game.villain_deck.current))]
+    choices = ['c'] + game.villain_deck.choices
     choice = game.input("Choose villain to stun ('c' to cancel): ", choices)
     if choice == 'c':
         return
-    game.villain_deck.current[int(choice)].stun(game)
+    game.villain_deck[choice].stun(game)
 
 def butterbeer_effect(game):
     if len(game.heroes) <= 2:
@@ -385,15 +393,15 @@ class FleurDelacour(Ally):
         self._used_ability = False
         game.heroes.active_hero.add_influence(game, 2)
         for card in game.heroes.active_hero._play_area:
-            if card.is_ally() and not card.name == "Fleur Delacour":
-                game.log(f"Ally {card.name} already played, Fleur adds 2💜")
+            if card.is_ally() and card != self:
+                game.log(f"Ally {card.name} already played, {self.name} adds 2💜")
                 game.heroes.active_hero.add_health(game, 2)
                 return
         game.heroes.active_hero.add_extra_card_effect(game, self.__extra_effect)
 
     def __extra_effect(self, game, card):
-        if card.is_ally() and not self._used_ability:
-            game.log(f"Ally {card.name} played, Fleur adds 2💜")
+        if card.is_ally() and card != self and not self._used_ability:
+            game.log(f"Ally {card.name} played, {self.name} adds 2💜")
             game.heroes.active_hero.add_health(game, 2)
             self._used_ability = True
 
@@ -446,17 +454,114 @@ game_four_cards = [
     Ally("Pomona Sprout", "Gain 1💰; anyone gains 2💜; roll the Hufflepuff die", 6, sprout_effect),
 ]
 
+def stupefy_effect(game):
+    game.heroes.active_hero.add(game, damage=1, cards=1)
+    game.locations.remove_control(game)
+
+class Owls(Item):
+    def __init__(self):
+        super().__init__("O.W.L.S.", "Gain 2💰; if you play 2 spells, gain 1↯ and 1💜", 4, self.__effect)
+        self._used_ability = False
+        self._spells_played = 0
+
+    def __effect(self, game):
+        self._used_ability = False
+        game.heroes.active_hero.add_influence(game, 2)
+        self._spells_played = sum([1 for card in game.heroes.active_hero._play_area if card.is_spell()])
+        if self._spells_played >= 2:
+            game.log(f"Already played {self._spells_played} spells, gaining 1↯ and 1💜")
+            game.heroes.active_hero.add(game, damage=1, hearts=1)
+            return
+        game.heroes.active_hero.add_extra_card_effect(game, self.__extra_effect)
+
+    def __extra_effect(self, game, card):
+        if card.is_spell():
+            self._spells_played += 1
+        if self._spells_played >= 2 and not self._used_ability:
+            game.log(f"Second spell played, {self.name} adds 1↯ and 1💜")
+            game.heroes.active_hero.add(game, damage=1, hearts=1)
+            self._used_ability = True
+
+def tonks_effect(game):
+    if game.locations._control_remove_allowed:
+        choice = game.input("Choose to (i) gain 3💰, (d) gain 2↯, or (c) remove 1💀: ", "idc")
+    else:
+        choice = game.input("Rmoving 💀 not allowed! Choose to (i) gain 3💰, (d) gain 2↯: ", "id")
+
+    match choice:
+        case "i":
+            game.heroes.active_hero.add_influence(game, 3)
+        case "d":
+            game.heroes.active_hero.add_damage(game, 2)
+        case "c":
+            game.locations.remove_control(game)
+
+def weasley_twin_effect(bonus):
+    def effect(game):
+        game.heroes.active_hero.add_damage(game)
+        game.roll_gryffindor_die()
+        for hero in game.heroes:
+            if hero == game.heroes.active_hero:
+                continue
+            for card in hero._hand:
+                if 'Weasley' in card.name:
+                    game.log(f"{hero.name} has {card.name}, ALL heroes gain 1{bonus}")
+                    match bonus:
+                        case "💰":
+                            game.heroes.all_heroes(game, lambda game, hero: hero.add_influence(game, 1))
+                        case "💜":
+                            game.heroes.all_heroes(game, lambda game, hero: hero.add_health(game, 1))
+                        case _:
+                            raise ValueError("Programmer Error! Invalid bonus!")
+                    return
+    return effect
+
+def cho_effect(game):
+    game.roll_ravenclaw_die()
+    hero = game.heroes.active_hero
+    if not hero.drawing_allowed:
+        game.log("Drawing not allowed, ignoring Cho's draw effect")
+        return
+    hero.draw(game, 3)
+    hero.choose_and_discard(game, 2, with_callbacks=False)
+
+class LunaAlly(Ally):
+    def __init__(self):
+        super().__init__("Luna Lovegood", "Gain 1💰; if you play an item, gain 1↯; roll the Ravenclaw die", 5, self.__effect)
+        self._used_ability = False
+
+    def __effect(self, game):
+        self._used_ability = False
+        game.heroes.active_hero.add_influence(game, 1)
+        game.roll_ravenclaw_die()
+        for card in game.heroes.active_hero._play_area:
+            if card.is_item() and card != self:
+                game.log(f"Item {card.name} already played, {self.name} adds 1↯")
+                game.heroes.active_hero.add_damage(game, 1)
+                return
+        game.heroes.active_hero.add_extra_card_effect(game, self.__extra_effect)
+
+    def __extra_effect(self, game, card):
+        if card.is_item() and not self._used_ability:
+            game.log(f"Item {card.name} played, {self.name} adds 1↯")
+            game.heroes.active_hero.add_damage(game, 1)
+            self._used_ability = True
+
+def kingsley_effect(game):
+    game.heroes.active_hero.add(game, damage=2, hearts=1)
+    game.locations.remove_control(game)
+
 game_five_cards = [
-    Spell("Stupefy", "Gain 1↯; remove 1💀; draw a card", 6),
-    Spell("Stupefy", "Gain 1↯; remove 1💀; draw a card", 6),
-    Item("O.W.L.S.", "Gain 2💰; if you play 2 Spells, gain 1↯ and 1💜", 4),
-    Item("O.W.L.S.", "Gain 2💰; if you play 2 Spells, gain 1↯ and 1💜", 4),
-    Ally("Nymphadora Tonks", "Gain 3💰 or 2↯, or remove 1💀", 5),
-    Ally("Fred Weasley", "Gain 1↯; if another hero has a Weasley, ALL heroes gain 1💰; roll the Gryffindor die", 4),
-    Ally("George Weasley", "Gain 1↯; if another hero has a Weasley, ALL heroes gain 1💜; roll the Gryffindor die", 4),
-    Ally("Cho Chang", "Draw three cards, discard two; roll the Ravenclaw die", 4),
-    Ally("Luna Lovegood", "Gain 1💰; if you play an item, gain 1↯; roll the Ravenclaw die", 5),
-    Ally("Kingsley Shacklebolt", "Gain 2↯ and 1💜, remove 1💀", 7),
+    Spell("Stupefy", "Gain 1↯; remove 1💀; draw a card", 6, stupefy_effect),
+    Spell("Stupefy", "Gain 1↯; remove 1💀; draw a card", 6, stupefy_effect),
+    Owls(),
+    Owls(),
+    Ally("Nymphadora Tonks", "Gain 3💰 or 2↯, or remove 1💀", 5, tonks_effect),
+    Ally("Fred Weasley", "Gain 1↯; if another hero has a Weasley, ALL heroes gain 1💰; roll the Gryffindor die", 4, weasley_twin_effect("💰")),
+    Ally("George Weasley", "Gain 1↯; if another hero has a Weasley, ALL heroes gain 1💜; roll the Gryffindor die", 4, weasley_twin_effect("💜")),
+    Ally("Cho Chang", "Draw three cards, discard two; roll the Ravenclaw die", 4, cho_effect),
+    LunaAlly(),
+    Ally("Kingsley Shacklebolt", "Gain 2↯ and 1💜, remove 1💀", 7, kingsley_effect),
 ]
 
 game_six_cards = [

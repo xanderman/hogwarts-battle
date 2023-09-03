@@ -1,5 +1,6 @@
 from functools import reduce
 
+import curses
 import operator
 import random
 
@@ -8,18 +9,25 @@ class DarkArtsDeck(object):
         self._window = window
         self._window.box()
         self._window.addstr(0, 1, "Dark Arts Deck")
+        self._window.noutrefresh()
+        beg = self._window.getbegyx()
+        self._pad_start_line = beg[0] + 1
+        self._pad_start_col = beg[1] + 1
+        end = self._window.getmaxyx()
+        self._pad_end_line = self._pad_start_line + end[0] - 3
+        self._pad_end_col = self._pad_start_col + end[1] - 3
+        self._pad = curses.newpad(100, 100)
+
         self._deck = reduce(operator.add, CARDS[:game_num])
         random.shuffle(self._deck)
         self._discard = []
         self._played = []
 
     def display_state(self):
-        self._window.clear()
-        self._window.box()
-        self._window.addstr(0, 1, "Dark Arts Deck")
+        self._pad.clear()
         for i, card in enumerate(self._played):
-            self._window.addstr(i+1, 1, f"{card.name}: {card.description}")
-        self._window.refresh()
+            self._pad.addstr(f"{card.name}: {card.description}\n")
+        self._pad.noutrefresh(0,0, self._pad_start_line,self._pad_start_col, self._pad_end_line,self._pad_end_col)
 
     def play_turn(self, game):
         game.log("-----Dark Arts phase-----")
@@ -232,27 +240,36 @@ game_four_cards = [
 
 def decree_effect(game):
     total = sum(1 for card in game.heroes.active_hero._hand if card.cost >= 4)
+    # game.log(f"{game.heroes.active_hero.name} has {total} cards with value 4💰 or more, loses {total}💜")
     game.heroes.active_hero.remove_health(game, total)
 
-def legilimency_effect(game):
-    pass
+def legilimency_effect(game, hero):
+    card = hero.reveal_top_card(game)
+    if card is None:
+        game.log(f"{hero.name} has no cards left to reveal")
+        return
+    game.log(f"{hero.name} revealed {card}")
+    if card.is_spell():
+        hero.discard_top_card(game)
+        hero.remove_health(game, 2)
 
 game_five_cards = [
     DarkArtsCard("Educational Decree", "Active hero loses 1💜 for each card with cost 4💰 or more in hand", decree_effect),
     DarkArtsCard("Educational Decree", "Active hero loses 1💜 for each card with cost 4💰 or more in hand", decree_effect),
-    DarkArtsCard("Legilimency", "ALL heroes reveal top card of deck, if spell discard it and lose 2💜", legilimency_effect),
+    DarkArtsCard("Legilimency", "ALL heroes reveal top card of deck, if spell discard it and lose 2💜", lambda game: game.heroes.all_heroes(game, legilimency_effect)),
     DarkArtsCard("Morsmordre", "ALL heroes lose 1💜, add 1💀", morsmordre_effect),
     DarkArtsCard("Imperio", "Choose another hero to lose 2💜; reveal another card", imperio_effect),
     DarkArtsCard("Avada Kedavra", "Active hero loses 3💜, if stun add +1💀; reveal another card", avada_kedavra_effect),
     DarkArtsCard("Crucio", "Active hero loses 1💜; reveal another card", crucio_effect),
 ]
 
-def sectumsempra_effect(game):
-    pass
+def sectumsempra_effect(game, hero):
+    hero.remove_health(game, 2)
+    hero.disallow_healing(game)
 
 game_six_cards = [
-    DarkArtsCard("Sectumsempra", "ALL heroes lose 2💜 and cannot gain 💜 this turn", sectumsempra_effect),
-    DarkArtsCard("Sectumsempra", "ALL heroes lose 2💜 and cannot gain 💜 this turn", sectumsempra_effect),
+    DarkArtsCard("Sectumsempra", "ALL heroes lose 2💜 and cannot gain 💜 this turn", lambda game: game.heroes.all_heroes(game, sectumsempra_effect)),
+    DarkArtsCard("Sectumsempra", "ALL heroes lose 2💜 and cannot gain 💜 this turn", lambda game: game.heroes.all_heroes(game, sectumsempra_effect)),
     DarkArtsCard("Morsmordre", "ALL heroes lose 1💜, add 1💀", morsmordre_effect),
 ]
 

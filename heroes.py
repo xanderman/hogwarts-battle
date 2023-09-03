@@ -10,29 +10,32 @@ class QuitGame(Exception):
 class Heroes(object):
     def __init__(self, window, game_num, hero_names):
         self._window = window
+        self._window.box()
+        self._window.addstr(0, 1, "Heroes")
+        beg = self._window.getbegyx()
+        self._pad_start_line = beg[0] + 1
+        self._pad_start_col = beg[1] + 1
+        end = self._window.getmaxyx()
+        self._pad_lines = end[0] - 1
+        self._pad_cols = end[1]
+        self._window.vline(1, self._pad_cols//2, curses.ACS_VLINE, self._pad_lines - 1)
+        self._window.hline(self._pad_lines//2, 1, curses.ACS_HLINE, self._pad_cols - 2)
+        self._window.noutrefresh()
+
         self._heroes = [HEROES[name](game_num) for name in hero_names]
         self._pads = [curses.newpad(100,100) for _ in self._heroes]
         self._harry = self._heroes[hero_names.index("Harry")] if "Harry" in hero_names else None
         self._current = 0
 
     def display_state(self):
-        beg_line, beg_col = self._window.getbegyx()
-        lines, cols = self._window.getmaxyx()
-        self._window.clear()
-        self._window.box()
-        self._window.addstr(0, 1, "Heroes")
-        self._window.vline(1, cols//2, curses.ACS_VLINE, lines - 2)
-        lines -= 1
-        self._window.hline(lines//2, 1, curses.ACS_HLINE, curses.COLS - 2)
-        self._window.refresh()
         for i, hero in enumerate(self._heroes):
             attr = curses.A_BOLD | curses.color_pair(1) if i == self._current else curses.A_NORMAL
             hero.display_state(self._pads[i], i, attr)
-            first_line = beg_line + 1 + (i//2)*(lines//2)
-            first_col = beg_col + 1 + (i%2)*(cols//2)
-            last_line = first_line + lines//2 - 2
-            last_col = first_col + cols//2 - 3
-            self._pads[i].refresh(0,0, first_line,first_col, last_line,last_col)
+            first_line = self._pad_start_line + (i//2)*(self._pad_lines//2)
+            first_col = self._pad_start_col + (i%2)*(self._pad_cols//2)
+            last_line = first_line + self._pad_lines//2 - 2
+            last_col = first_col + self._pad_cols//2 - 3
+            self._pads[i].noutrefresh(0,0, first_line,first_col, last_line,last_col)
 
     def __len__(self):
         return len(self._heroes)
@@ -174,23 +177,25 @@ class Hero(object):
 
     def display_state(self, window, i, attr):
         window.clear()
-        window.addstr(0,0, f" {i}: {self.name} ({self._health}/{self._max_health}💜) -- Deck: {len(self._deck)}, Discard: {len(self._discard)}", attr)
-        window.addstr(1,0, f"     {self._damage_tokens}↯, {self._influence_tokens}💰")
-        window.addstr(2,0, f"     Hand:")
-        row = 3
+        window.addstr(f"{i}: {self.name} ({self._health}/{self._max_health}💜) -- Deck: {len(self._deck)}, Discard: {len(self._discard)}\n", attr)
+        if self.ability_description is not None:
+            window.addstr(f"{self.ability_description}\n")
+        window.addstr(f"  {self._damage_tokens}↯, {self._influence_tokens}💰\n")
+        window.addstr(f"  Hand:\n")
         for i, card in enumerate(self._hand):
-            window.addstr(row,0, f"       {i}: ", curses.A_BOLD)
+            window.addstr(f"    {i}: ", curses.A_BOLD)
             card.display_name(window, curses.A_BOLD)
-            window.addstr(row+1,0, f"         {card.description}")
-            row += 2
+            window.addstr(f"\n        {card.description}\n")
         if len(self._play_area) != 0:
-            window.addstr(row,0, "     Play area:")
-            row += 1
+            window.addstr("  Play area:\n")
             for i, card in enumerate(self._play_area):
-                window.addstr(row,0, f"       {i}: ", curses.A_BOLD)
+                window.addstr(f"    {i}: ", curses.A_BOLD)
                 card.display_name(window, curses.A_BOLD)
-                window.addstr(row+1,0, f"         {card.description}")
-                row += 2
+                window.addstr(f"\n        {card.description}\n")
+
+    @property
+    def ability_description(self):
+        return None
 
     def is_stunned(self, game):
         return self._health == 0
@@ -207,11 +212,11 @@ class Hero(object):
         if self.is_stunned(game):
             game.log(f"{self.name} is stunned and cannot gain/lose health!")
             return
-        if amount > 0 and not self.healing_allowed:
-            game.log(f"{self.name}: healing not allowed!")
-            return
         if amount > 0 and self._health == self._max_health:
             game.log(f"{self.name} is already at max health!")
+            return
+        if amount > 0 and not self.healing_allowed:
+            game.log(f"{self.name}: healing not allowed!")
             return
         if amount < -1 and any(card.name == "Invisibility cloak" for card in self._hand):
             game.log(f"Invisibility cloak prevents {-1 - amount}↯!")
@@ -415,14 +420,17 @@ class Hero(object):
         if self._damage_tokens == 0:
             game.log("No ↯ to assign!")
             return
-        if len(game.villain_deck.current) == 0:
+        if len(game.villain_deck.choices) == 0:
             game.log("No villains to assign ↯ to!")
             return None
-        choices = ['c'] + [str(i) for i in range(len(game.villain_deck.current))]
+        choices = ['c'] + game.villain_deck.choices
         choice = game.input("Choose villain to assign ↯ to ('c' to cancel): ", choices)
         if choice == 'c':
             return None
-        villain = game.villain_deck.current[int(choice)]
+        if choice == 'v' and not game.villain_deck.voldemort_vulnerable():
+            game.log("Voldemort is not vulnerable!")
+            return None
+        villain = game.villain_deck[choice]
         if self._only_one_damage and villain.took_damage:
             game.log(f"{villain.name} has already been assigned damage!")
             return None
@@ -602,7 +610,6 @@ def spectrespecs_effect(game):
 broom_cards = ["Quidditch Gear", "Cleansweep 11", "Firebolt", "Nimbus 2000", "Nimbus 2001"]
 def lion_hat_effect(game):
     game.heroes.active_hero.add_influence(game)
-    all_cards = []
     for hero in game.heroes:
         if hero == game.heroes.active_hero:
             continue
@@ -629,6 +636,14 @@ class Hermione(Hero):
         ])
         self._spells_played = 0
         self._used_ability = False
+
+    @property
+    def ability_description(self):
+        if self._game_num < 3:
+            return None
+        if self._game_num < 7:
+            return "If you play 4 or more spells, one hero gains 1💰"
+        return "If you play 4 or more spells, ALL heroes gain 1💰"
 
     def play_turn(self, game):
         self._spells_played = 0
@@ -678,6 +693,14 @@ class Ron(Hero):
         self._damage_assigned = 0
         self._used_ability = False
 
+    @property
+    def ability_description(self):
+        if self._game_num < 3:
+            return None
+        if self._game_num < 7:
+            return "If you assign 3 or more ↯, one hero gains 2💜"
+        return "If you assign 3 or more ↯, ALL heroes gain 2💜"
+
     def assign_damage(self, game):
         villain = super().assign_damage(game)
         if villain is None:
@@ -726,6 +749,14 @@ class Harry(Hero):
         ])
         self._used_ability = False
 
+    @property
+    def ability_description(self):
+        if self._game_num < 3:
+            return None
+        if self._game_num < 7:
+            return "The first time 💀 is removed on any turn, one hero gains 1↯"
+        return "The first time 💀 is removed on any turn, two heroes gain 1↯"
+
     def control_callback(self, game, amount):
         if amount > -1:
             return
@@ -770,6 +801,14 @@ class Neville(Hero):
             hogwarts.Item("Mandrake", "Gain 1↯, or one hero gains 2💜", 0, mandrake_effect),
         ])
         self._healed_heroes = set()
+
+    @property
+    def ability_description(self):
+        if self._game_num < 3:
+            return None
+        if self._game_num < 7:
+            return "The first time a hero gains 💜 on your turn, that hero gains +1💜"
+        return "Each time a hero gains 💜 on your turn, that hero gains +1💜"
 
     def health_callback(self, game, hero, amount):
         if self._game_num >= 7:
@@ -830,6 +869,12 @@ class Ginny(Hero):
         self._villains_damaged = set()
         self._used_ability = False
 
+    @property
+    def ability_description(self):
+        if self._game_num < 3:
+            return None
+        return "If you assign ↯ to 2 or more villains, ALL heroes gain 1💰"
+
     def assign_damage(self, game):
         villain = super().assign_damage(game)
         if villain is None:
@@ -862,6 +907,12 @@ class Luna(Hero):
             hogwarts.Item("Lion Hat", "Gain 1💰; if another hero has broom or quidditch gear, gain 1↯", 0, lion_hat_effect),
         ])
         self._used_ability = False
+
+    @property
+    def ability_description(self):
+        if self._game_num < 3:
+            return None
+        return "If you draw at least one extra card, one hero gains 2💜"
 
     def draw(self, game, count=1, end_of_turn=False):
         cards_before = len(self._hand)

@@ -7,8 +7,26 @@ import random
 class VillainDeck(object):
     def __init__(self, window, game_num):
         self._window = window
+        self._window.box()
+        self._window.addstr(0, 1, "Dark Arts Deck")
+        self._window.noutrefresh()
+        beg = self._window.getbegyx()
+        self._pad_start_line = beg[0] + 1
+        self._pad_start_col = beg[1] + 1
+        end = self._window.getmaxyx()
+        self._pad_end_line = self._pad_start_line + end[0] - 3
+        self._pad_end_col = self._pad_start_col + end[1] - 3
+        self._pad = curses.newpad(100, 100)
+
         self._deck = reduce(operator.add, VILLAINS[:game_num])
         self._max = MAX_VILLAINS[game_num]
+        self._voldemort = None
+        if game_num == 5:
+            self._voldemort = GameFiveVoldemort()
+        elif game_num == 6:
+            self._voldemort = GameSixVoldemort()
+        elif game_num == 7:
+            self._voldemort = GameSevenVoldemort()
 
         random.shuffle(self._deck)
         self.current = []
@@ -16,15 +34,33 @@ class VillainDeck(object):
     def display_state(self):
         self._window.clear()
         self._window.box()
-        self._window.addstr(0, 1, f"Villains ({len(self._deck)} left)")
+        left_str = f"({len(self._deck)}"
+        if self._voldemort is not None:
+            left_str += " + Voldemort"
+        self._window.addstr(0, 1, f"Villains {left_str} left)")
+        self._window.noutrefresh()
+
+        self._pad.clear()
         for i, villain in enumerate(self.current):
-            villain.display_state(self._window, 3*i+1, i)
-        self._window.refresh()
+            villain.display_state(self._pad, i)
+        if self.voldemort_active():
+            self._display_voldemort()
+        self._pad.noutrefresh(0,0, self._pad_start_line,self._pad_start_col, self._pad_end_line,self._pad_end_col)
+
+    def _display_voldemort(self):
+        self._pad.addstr("Voldemort:")
+        if self.voldemort_vulnerable():
+            self._pad.addstr(" *vulnerable*\n", curses.A_BOLD | curses.color_pair(1))
+        else:
+            self._pad.addstr(" *invulnerable*\n", curses.A_BOLD | curses.color_pair(2))
+        self._voldemort.display_state(self._pad, 'v')
 
     def play_turn(self, game):
         game.log("-----Villain phase-----")
         for villain in self.current:
             villain.play_turn(game)
+        if self.voldemort_active():
+            self._voldemort.play_turn(game)
 
     def reveal(self, game):
         for villain in self.current:
@@ -38,16 +74,33 @@ class VillainDeck(object):
                 game.log(f"Death Eater (x{death_eaters}): Villain revealed, ALL heroes lose {death_eaters}💜")
                 game.heroes.all_heroes(game, lambda game, hero: hero.remove_health(game, death_eaters))
 
-    def choose_villain(self, game, prompt="Choose a villain: "):
-        if len(self.current) == 1:
-            return self.current[0]
+    def voldemort_active(self):
+        return self._voldemort is not None and len(self._deck) == 0
 
-        choice = int(game.input(prompt, range(len(self.current))))
-        return self.current[choice]
+    def voldemort_vulnerable(self):
+        return self.voldemort_active() and len(self.current) == 0
+
+    @property
+    def choices(self):
+        choices = [str(i) for i in range(len(self.current))]
+        if self.voldemort_active():
+            choices.append('v')
+        return choices
+
+    def __len__(self):
+        voldemort = 1 if self._voldemort is not None else 0
+        return len(self._deck) + len(self.current) + voldemort
+
+    def __getitem__(self, key):
+        if key == 'v':
+            return self._voldemort
+        return self.current[int(key)]
 
     def all_villains(self, game, effect):
         for villain in self.current:
             effect(game, villain)
+        if self.voldemort_active():
+            effect(game, self._voldemort)
 
 
 class Villain(object):
@@ -68,12 +121,12 @@ class Villain(object):
         self._stunned = False
         self._stunned_by = None
 
-    def display_state(self, window, row, i):
-        window.addstr(row  , 1, f"{i}: {self.name} ({self._damage}↯/{self._health}💜)")
+    def display_state(self, window, i):
+        window.addstr(f"{i}: {self.name} ({self._damage}↯/{self._health}💜)")
         if self._stunned:
             window.addstr(" *stunned*", curses.A_BOLD | curses.color_pair(1))
-        window.addstr(row+1, 1, f"     {self.description}")
-        window.addstr(row+2, 1, f"     Reward: {self.reward_desc}")
+        window.addstr(f"\n     {self.description}")
+        window.addstr(f"\n     Reward: {self.reward_desc}\n")
 
     def play_turn(self, game):
         if self._stunned:
@@ -95,7 +148,8 @@ class Villain(object):
         self._damage += amount
         if self._damage >= self._health:
             self.reward(game)
-            game.villain_deck.current.remove(self)
+            if self != game.villain_deck._voldemort:
+                game.villain_deck.current.remove(self)
             return True
         return False
 
@@ -203,9 +257,9 @@ def riddle_effect(game):
         choice = game.input(f"Choose a card for {hero.name} to discard or (h) to lose 2💜: ", choices)
         if choice == 'h':
             hero.remove_health(game, 2)
-            break
-        choice = int(choice)
-        hero.discard(game, choice)
+        else:
+            choice = int(choice)
+            hero.discard(game, choice)
 
 def riddle_reward(game, hero):
     allies = [card for card in hero._discard if card.is_ally()]
@@ -319,7 +373,7 @@ class Umbridge(Villain):
             if self._stunned:
                 game.log(f"{self.name} is stunned! No penalty for acquire")
                 return
-            game.log(f"{self.name}: {game.heroes.active_hero.name} acquired {card}, so loses 1💜")
+            game.log(f"{self.name}: {game.heroes.active_hero.name} acquired {card.name}, so loses 1💜")
             hero.remove_health(game, 1)
 
     def __reward(self, game):
@@ -327,7 +381,6 @@ class Umbridge(Villain):
         game.heroes.all_heroes(game, lambda game, hero: hero.add(game, influence=1, hearts=2))
 
 game_five_villains = [
-    # TODO villain revealed callback
     Umbridge(),
     Villain("Death Eater", "If Morsmordre or new Villain revealed, ALL Heroes lose 1💜",
             "ALL heroes gain 1💜; remove 1💀", 7,
