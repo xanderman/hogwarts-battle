@@ -72,7 +72,7 @@ class VillainDeck(object):
             villain.on_reveal(game)
             if death_eaters > 0:
                 game.log(f"Death Eater (x{death_eaters}): Villain revealed, ALL heroes lose {death_eaters}💜")
-                game.heroes.all_heroes(game, lambda game, hero: hero.remove_health(game, death_eaters))
+                game.heroes.all_heroes.remove_health(game, death_eaters)
 
     def voldemort_active(self):
         return self._voldemort is not None and len(self._deck) == 0
@@ -148,7 +148,9 @@ class Villain(object):
         self._damage += amount
         if self._damage >= self._health:
             self.reward(game)
-            if self != game.villain_deck._voldemort:
+            if self == game.villain_deck._voldemort:
+                game.villain_deck._voldemort = None
+            else:
                 game.villain_deck.current.remove(self)
             return True
         return False
@@ -206,7 +208,7 @@ class Crabbe(Villain):
 
     def __reward(self, game):
         game.heroes.remove_discard_callback(game, self)
-        game.heroes.all_heroes(game, lambda game, hero: hero.draw(game))
+        game.heroes.all_heroes.draw(game)
 
 
 game_one_villains = [
@@ -215,7 +217,7 @@ game_one_villains = [
     Villain("Quirinus Quirrell", "Active hero loses 1💜",
             "ALL heroes gain 1💜 and 1💰", 6,
             effect=lambda game: game.heroes.active_hero.remove_health(game),
-            reward=lambda game: game.heroes.all_heroes(game, lambda game, hero: hero.add(game, influence=1, hearts=1))),
+            reward=lambda game: game.heroes.all_heroes.add(game, influence=1, hearts=1)),
 ]
 
 class Lucius(Villain):
@@ -237,12 +239,12 @@ class Lucius(Villain):
 
     def __reward(self, game):
         game.locations.remove_control_callback(game, self)
-        game.heroes.all_heroes(game, lambda game, hero: hero.add_influence(game, 1))
+        game.heroes.all_heroes.add_influence(game, 1)
         game.locations.remove_control(game)
 
 def basilisk_reward(game):
     game.heroes.basilisk_defeated(game)
-    game.heroes.all_heroes(game, lambda game, hero: hero.draw(game))
+    game.heroes.all_heroes.draw(game)
     game.locations.remove_control(game)
 
 def riddle_effect(game):
@@ -289,11 +291,11 @@ game_two_villains = [
             on_recover_from_stun=lambda game: game.heroes.basilisk_revealed(game)),
     Villain("Tom Riddle", "For each Ally in hand, lose 2💜 or discard",
             "ALL heroes gain 2💜 or take Ally from discard", 6,
-            effect=riddle_effect, reward=lambda game: game.heroes.all_heroes(game, riddle_reward)),
+            effect=riddle_effect, reward=lambda game: game.heroes.all_heroes.effect(game, riddle_reward)),
 ]
 
 def dementor_reward(game):
-    game.heroes.all_heroes(game, lambda game, hero: hero.add_health(game, 2))
+    game.heroes.all_heroes.add_health(game, 2)
     game.locations.remove_control(game)
 
 def pettigrew_effect(game):
@@ -309,7 +311,7 @@ def pettigrew_effect(game):
 
 def pettigrew_reward(game):
     game.locations.remove_control(game)
-    game.heroes.all_heroes(game, pettigrew_per_hero)
+    game.heroes.all_heroes.effect(game, pettigrew_per_hero)
 
 def pettigrew_per_hero(game, hero):
     spells = [card for card in hero._discard if card.is_spell()]
@@ -343,7 +345,7 @@ game_three_villains = [
 ]
 
 def death_eater_reward(game):
-    game.heroes.all_heroes(game, lambda game, hero: hero.add_health(game, 1))
+    game.heroes.all_heroes.add_health(game, 1)
     game.locations.remove_control(game)
 
 def crouch_reward(game):
@@ -378,7 +380,7 @@ class Umbridge(Villain):
 
     def __reward(self, game):
         game.heroes.remove_acquire_callback(game, self)
-        game.heroes.all_heroes(game, lambda game, hero: hero.add(game, influence=1, hearts=2))
+        game.heroes.all_heroes.add(game, influence=1, hearts=2)
 
 game_five_villains = [
     Umbridge(),
@@ -395,7 +397,7 @@ class GameFiveVoldemort(Villain):
 
 def bellatrix_reward(game):
     game.locations.remove_control(game, 2)
-    game.heroes.all_heroes(game, bellatrix_per_hero)
+    game.heroes.all_heroes.effect(game, bellatrix_per_hero)
 
 def bellatrix_per_hero(game, hero):
     items = [card for card in hero._discard if card.is_item()]
@@ -413,7 +415,7 @@ def bellatrix_per_hero(game, hero):
 
 def greyback_reward(game):
     game.heroes.greyback_defeated(game)
-    game.heroes.all_heroes(game, lambda game, hero: hero.add_health(game, 3))
+    game.heroes.all_heroes.add_health(game, 3)
     game.locations.remove_control(game, 2)
 
 game_six_villains = [
@@ -436,7 +438,7 @@ class GameSixVoldemort(Villain):
         die_result = random.choice("↯↯↯💰💜🃏")
         if die_result == "↯":
             game.log("Rolled ↯, ALL heroes lose 1💜")
-            game.heroes.all_heroes(game, lambda game, hero: hero.remove_health(game, 1))
+            game.heroes.all_heroes.remove_health(game, 1)
         elif die_result == "💰":
             game.log("Rolled 💰, adding 1💀 to the location")
             game.locations.add_control(game)
@@ -445,7 +447,7 @@ class GameSixVoldemort(Villain):
             game.villain_deck.all_villains(lambda game, villain: villain.remove_damage(game, 1))
         elif die_result == "🃏":
             game.log("Rolled 🃏, ALL heroes discard a card")
-            game.heroes.all_heroes(game, lambda game, hero: hero.choose_and_discard(game))
+            game.heroes.all_heroes.choose_and_discard(game)
 
 game_seven_villains = [
 ]
@@ -465,7 +467,7 @@ def GameSevenVoldemort(Villain):
             return
         game.log(f"{self.name}: 💀 removed, ALL heroes lose 1💜 for each")
         for _ in range(-amount):
-            game.heroes.all_heroes(game, lambda game, hero: hero.remove_health(game, 1))
+            game.heroes.all_heroes.remove_health(game, 1)
 
 VILLAINS = [
     game_one_villains,

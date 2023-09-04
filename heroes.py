@@ -19,11 +19,13 @@ class Heroes(object):
         self._pad_lines = end[0] - 1
         self._pad_cols = end[1]
         self._window.vline(1, self._pad_cols//2, curses.ACS_VLINE, self._pad_lines - 1)
-        self._window.hline(self._pad_lines//2, 1, curses.ACS_HLINE, self._pad_cols - 2)
+        if len(hero_names) > 2:
+            self._window.hline(self._pad_lines//2, 1, curses.ACS_HLINE, self._pad_cols - 2)
         self._window.noutrefresh()
 
         self._heroes = [HEROES[name](game_num) for name in hero_names]
         self._pads = [curses.newpad(100,100) for _ in self._heroes]
+        self._hero_rows = 2 if len(hero_names) > 2 else 1
         self._harry = self._heroes[hero_names.index("Harry")] if "Harry" in hero_names else None
         self._current = 0
 
@@ -33,7 +35,7 @@ class Heroes(object):
             hero.display_state(self._pads[i], i, attr)
             first_line = self._pad_start_line + (i//2)*(self._pad_lines//2)
             first_col = self._pad_start_col + (i%2)*(self._pad_cols//2)
-            last_line = first_line + self._pad_lines//2 - 2
+            last_line = first_line + self._pad_lines//self._hero_rows - 2
             last_col = first_col + self._pad_cols//2 - 3
             self._pads[i].noutrefresh(0,0, first_line,first_col, last_line,last_col)
 
@@ -74,11 +76,34 @@ class Heroes(object):
                 continue
             return chosen
 
-    def all_heroes(self, game, effect, skip_active=False):
-        for hero in self._heroes:
-            if skip_active and hero == self.active_hero:
+    def choose_two_heroes(self, game, prompt="to eat pizza", disallow=None, disallow_msg="{} cannot be chosen!"):
+        if len(self._heroes) <= 2:
+            return self.all_heroes
+
+        while True:
+            first = self._heroes[int(game.input(f"Choose first hero {prompt}: ", range(len(self._heroes))))]
+            if first == disallow:
+                game.log(disallow_msg.format(disallow.name))
                 continue
-            effect(game, hero)
+            break
+        while True:
+            second = self._heroes[int(game.input(f"Choose second hero {prompt}: ", range(len(self._heroes))))]
+            if second == disallow:
+                game.log(disallow_msg.format(disallow.name))
+                continue
+            if second == first:
+                game.log("Cannot choose the same hero twice!")
+                continue
+            break
+        return HeroList(first, second)
+
+    @property
+    def all_heroes(self):
+        return HeroList(*self._heroes)
+
+    @property
+    def all_heroes_except_active(self):
+        return HeroList(*[hero for hero in self._heroes if hero != self.active_hero])
 
     def next(self):
         self._current = (self._current + 1) % len(self._heroes)
@@ -148,6 +173,21 @@ class Heroes(object):
             hero.remove_health_callback(game, callback)
 
 
+class HeroList(list):
+    def __init__(self, *args):
+        super().__init__(args)
+
+    def __getattr__(self, attr):
+        def f(game, *args, **kwargs):
+            for hero in self:
+                getattr(hero, attr)(game, *args, **kwargs)
+        return f
+
+    def effect(self, game, effect=lambda game, hero: None):
+        for hero in self:
+            effect(game, hero)
+
+
 class Hero(object):
     def __init__(self, name, game_num, starting_deck):
         self.name = name
@@ -181,13 +221,13 @@ class Hero(object):
         if self.ability_description is not None:
             window.addstr(f"{self.ability_description}\n")
         window.addstr(f"  {self._damage_tokens}↯, {self._influence_tokens}💰\n")
-        window.addstr(f"  Hand:\n")
+        window.addstr(f"  Hand ({len(self._hand)} cards):\n")
         for i, card in enumerate(self._hand):
             window.addstr(f"    {i}: ", curses.A_BOLD)
             card.display_name(window, curses.A_BOLD)
             window.addstr(f"\n        {card.description}\n")
         if len(self._play_area) != 0:
-            window.addstr("  Play area:\n")
+            window.addstr("  Play area ({len(self._play_area)} cards):\n")
             for i, card in enumerate(self._play_area):
                 window.addstr(f"    {i}: ", curses.A_BOLD)
                 card.display_name(window, curses.A_BOLD)
@@ -438,6 +478,8 @@ class Hero(object):
         if villain.add_damage(game):
             for reward in self._extra_villain_rewards:
                 reward(game)
+            # Extra rewards only apply once
+            self._extra_villain_rewards = []
         return villain
 
     def add_influence(self, game, amount=1):
@@ -547,7 +589,7 @@ def beedle_effect(game):
         case "y":
             game.heroes.active_hero.add_influence(game, 2)
         case "a":
-            game.heroes.all_heroes(game, lambda game, hero: hero.add_influence(game, 1))
+            game.heroes.all_heroes.add_influence(game, 1)
         case _:
             raise ValueError("Programmer Error! Invalid choice!")
 
@@ -595,7 +637,7 @@ def bat_bogey_effect(game):
         case "d":
             game.heroes.active_hero.add_damage(game)
         case "h":
-            game.heroes.all_heroes(game, lambda game, hero: hero.add_health(game, 1))
+            game.heroes.all_heroes.add_health(game, 1)
         case _:
             raise ValueError("Programmer Error! Invalid choice!")
 
@@ -668,12 +710,11 @@ class Hermione(Hero):
 
     def _game_seven_ability(self, game):
         game.log(f"{self.name} played 4 Spells, ALL heroes gain 1💰: ")
-        game.heroes.all_heroes(game, lambda game, hero: hero.add_influence(game, 1))
+        game.heroes.all_heroes.add_influence(game, 1)
 
     def _monster_box_one_ability(self, game):
-        first = game.heroes.choose_hero(game, prompt=f"{self.name} played 4 Spells. Choose first hero to gain 1↯: ")
-        first.add_damage(game, 1)
-        game.heroes.choose_hero(game, prompt="Choose second hero to gain 1↯: ", disallow=first).add_damage(game, 1)
+        game.log(f"{self.name} played 4 spells. Two heroes gain 1↯")
+        game.heroes.choose_two_heroes(game, prompt="to gain 1↯").add_damage(game, 1)
 
 
 class Ron(Hero):
@@ -721,16 +762,15 @@ class Ron(Hero):
         super().play_turn(game)
 
     def _game_three_ability(self, game):
-        game.log(f"{self.name} assigned 3 or more ↯, one hero gains 2💜")
-        game.heroes.choose_hero(game, prompt="Choose hero to gain 2💜: ").add_health(game, 2)
+        game.heroes.choose_hero(game, prompt=f"{self.name} assigned 3 or more ↯, choose hero to gain 2💜: ").add_health(game, 2)
 
     def _game_seven_ability(self, game):
         game.log(f"{self.name} assigned 3 or more ↯, all heroes gain 2💜")
-        game.heroes.all_heroes(game, lambda game, hero: hero.add_health(game, 2))
+        game.heroes.all_heroes.add_health(game, 2)
 
     def _monster_box_one_ability(self, game):
         game.log(f"{self.name} assigned 3 or more ↯/💰, all heroes gain 1💜")
-        game.heroes.all_heroes(game, lambda game, hero: hero.add_health(game, 1))
+        game.heroes.all_heroes.add_health(game, 1)
 
 
 class Harry(Hero):
@@ -776,14 +816,12 @@ class Harry(Hero):
         if self._used_ability:
             return
         game.log(f"{self.name}: first 💀 removed this turn, two heroes gain 1↯")
-        first = game.heroes.choose_hero(game, prompt="Choose first hero to gain 1↯: ")
-        first.add_damage(game, 1)
-        game.heroes.choose_hero(game, prompt="Choose second hero to gain 1↯: ", disallow=first, disallow_msg="You already chose {}!").add_damage(game, 1)
+        game.heroes.choose_two_heroes(game, prompt="to gain 1↯").add_damage(game, 1)
 
     def _monster_box_one_ability_control_callback(self, game, amount):
         game.log(f"{self.name}: 💀 removed, ALL heroes gain 1💜 for each")
         for _ in range(amount):
-            game.heroes.all_heroes(game, lambda game, hero: hero.add_health(game, 1))
+            game.heroes.all_heroes.add_health(game, 1)
 
 
 class Neville(Hero):
@@ -823,13 +861,13 @@ class Neville(Hero):
         if amount < 1:
             return
         self._healed_heroes.add(hero)
-        game.log(f"First time Neville healed {hero.name} this turn, {hero.name} gets an extra 💜")
+        game.log(f"First time {self.name} healed {hero.name} this turn, {hero.name} gets an extra 💜")
         hero.add_health(game, 1)
 
     def _game_seven_ability_healing_callback(self, game, hero, amount):
         if amount < 1:
             return
-        game.log(f"Neville healed {hero.name}, {hero.name} gets an extra 💜")
+        game.log(f"{self.name} healed {hero.name}, {hero.name} gets an extra 💜")
         hero.add_health(game, 1)
 
     def _monster_box_one_ability_healing_callback(self, game, hero, amount):
@@ -838,7 +876,7 @@ class Neville(Hero):
         if amount < 1:
             return
         self._healed_heroes.add(hero)
-        game.log(f"First time Neville healed {hero.name} this turn, {hero.name} gets an extra 💜 or 💰")
+        game.log(f"First time {self.name} healed {hero.name} this turn, {hero.name} gets an extra 💜 or 💰")
         match game.input("Choose effect: (h)💜, (i)💰: ", "hi"):
             case "h":
                 hero.add_health(game, 1)
@@ -884,7 +922,7 @@ class Ginny(Hero):
             return
         self._used_ability = True
         game.log(f"{self.name} assigned ↯/💰 to 2 or more villains, ALL heroes gain 1💰")
-        game.heroes.all_heroes(game, lambda game, hero: hero.add_influence(game, 1))
+        game.heroes.all_heroes.add_influence(game, 1)
 
     def play_turn(self, game):
         self._villains_damaged = set()

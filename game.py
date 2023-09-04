@@ -28,10 +28,12 @@ class Game(object):
         hogwarts_window = window.subwin(15, curses.COLS // 2, 7, curses.COLS // 2)
         self.hogwarts_deck = hogwarts.HogwartsDeck(hogwarts_window, game_num)
 
-        self._heroes_window = window.subwin(40, curses.COLS, 22, 0)
+        heroes_height = 40 if len(hero_names) > 2 else 20
+        self._heroes_window = window.subwin(heroes_height, curses.COLS, 22, 0)
         self.heroes = heroes.Heroes(self._heroes_window, game_num, hero_names)
 
-        self._log_window = window.subwin(curses.LINES - 62, curses.COLS, 62, 0)
+        log_begin = 22 + heroes_height
+        self._log_window = window.subwin(curses.LINES - log_begin, curses.COLS, log_begin, 0)
         self._log_window.box()
         self._log_window.addstr(0, 1, "Log")
         self._log_window.noutrefresh()
@@ -49,7 +51,7 @@ class Game(object):
         self.villain_deck.reveal(self)
         self.hogwarts_deck.refill_market(self)
         self._active_hero = 0
-        self.heroes.all_heroes(self, lambda game, hero: hero.draw(game, 5, True))
+        self.heroes.all_heroes.draw(self, 5, True)
 
         if self.heroes._harry:
             self.locations.add_control_callback(self, self.heroes._harry)
@@ -123,7 +125,7 @@ class Game(object):
         self.heroes.play_turn(self)
 
         self.log("-----Cleanup phase-----")
-        self.heroes.all_heroes(self, lambda game, hero: hero.recover_from_stun(game))
+        self.heroes.all_heroes.recover_from_stun(self)
         self.dark_arts_deck.end_turn()
         self.villain_deck.reveal(self)
         self.heroes.active_hero.end_turn(self)
@@ -156,16 +158,16 @@ class Game(object):
         die_result = random.choice(options)
         if die_result == "↯":
             self.log("Rolled ↯, ALL heroes gain 1↯")
-            self.heroes.all_heroes(self, lambda game, hero: hero.add_damage(game, 1))
+            self.heroes.all_heroes.add_damage(self, 1)
         elif die_result == "💰":
             self.log("Rolled 💰, ALL heroes gain 1💰")
-            self.heroes.all_heroes(self, lambda game, hero: hero.add_influence(game, 1))
+            self.heroes.all_heroes.add_influence(self, 1)
         elif die_result == "💜":
             self.log("Rolled 💜, ALL heroes gain 1💜")
-            self.heroes.all_heroes(self, lambda game, hero: hero.add_health(game, 1))
+            self.heroes.all_heroes.add_health(self, 1)
         elif die_result == "🃏":
             self.log("Rolled 🃏, ALL heroes draw a card")
-            self.heroes.all_heroes(self, lambda game, hero: hero.draw(game))
+            self.heroes.all_heroes.draw(self)
 
 
 def main(stdscr, game_num, hero_names):

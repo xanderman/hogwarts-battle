@@ -77,8 +77,8 @@ def petrification_effect(game, hero):
     hero.disallow_drawing(game)
 
 game_one_cards = [
-    DarkArtsCard("Petrification", "ALL heroes lose 1💜; no drawing cards", lambda game: game.heroes.all_heroes(game, petrification_effect)),
-    DarkArtsCard("Petrification", "ALL heroes lose 1💜; no drawing cards", lambda game: game.heroes.all_heroes(game, petrification_effect)),
+    DarkArtsCard("Petrification", "ALL heroes lose 1💜; no drawing cards", lambda game: game.heroes.all_heroes.effect(game, petrification_effect)),
+    DarkArtsCard("Petrification", "ALL heroes lose 1💜; no drawing cards", lambda game: game.heroes.all_heroes.effect(game, petrification_effect)),
     DarkArtsCard("Expulso", "Active hero loses 2💜", lambda game: game.heroes.active_hero.remove_health(game, 2)),
     DarkArtsCard("Expulso", "Active hero loses 2💜", lambda game: game.heroes.active_hero.remove_health(game, 2)),
     DarkArtsCard("Expulso", "Active hero loses 2💜", lambda game: game.heroes.active_hero.remove_health(game, 2)),
@@ -156,15 +156,14 @@ def obliviate_effect(game, hero):
 game_two_cards = [
     DarkArtsCard("Hand of Glory", "Active hero loses 1💜, add 1💀", hand_of_glory_effect),
     DarkArtsCard("Hand of Glory", "Active hero loses 1💜, add 1💀", hand_of_glory_effect),
-    DarkArtsCard("Relashio", "ALL heroes discard an item or lose 2💜", lambda game: game.heroes.all_heroes(game, relashio_effect)),
-    DarkArtsCard("Poison", "ALL heroes discard an ally or lose 2💜", lambda game: game.heroes.all_heroes(game, poison_effect)),
-    DarkArtsCard("Obliviate", "ALL heroes discard a spell or lose 2💜", lambda game: game.heroes.all_heroes(game, obliviate_effect)),
+    DarkArtsCard("Relashio", "ALL heroes discard an item or lose 2💜", lambda game: game.heroes.all_heroes.effect(game, relashio_effect)),
+    DarkArtsCard("Poison", "ALL heroes discard an ally or lose 2💜", lambda game: game.heroes.all_heroes.effect(game, poison_effect)),
+    DarkArtsCard("Obliviate", "ALL heroes discard a spell or lose 2💜", lambda game: game.heroes.all_heroes.effect(game, obliviate_effect)),
 ]
 
 def kiss_effect(game):
-    active_hero = game.heroes.active_hero
-    active_hero.remove_health(game, 2)
-    game.heroes.all_heroes(game, lambda game, hero: hero.remove_health(game, 1), skip_active=True)
+    game.heroes.active_hero.remove_health(game, 2)
+    game.heroes.all_heroes_except_active.remove_health(game, 1)
 
 def opugno_effect(game, hero):
     card = hero.reveal_top_card(game)
@@ -184,7 +183,7 @@ def tarantallegra_effect(game):
 game_three_cards = [
     DarkArtsCard("Dementor's Kiss", "Active hero loses 2💜, others lose 1💜", kiss_effect),
     DarkArtsCard("Dementor's Kiss", "Active hero loses 2💜, others lose 1💜", kiss_effect),
-    DarkArtsCard("Opugno", "ALL heroes reveal top card, if it costs 1💰 or more discard it and lose 2💜", lambda game: game.heroes.all_heroes(game, opugno_effect)),
+    DarkArtsCard("Opugno", "ALL heroes reveal top card, if it costs 1💰 or more discard it and lose 2💜", lambda game: game.heroes.all_heroes.effect(game, opugno_effect)),
     DarkArtsCard("Tarantallegra", "Active hero loses 1💜 and cannot assign more than 1↯ to each Villain", tarantallegra_effect),
 ]
 
@@ -192,7 +191,7 @@ def morsmordre_effect(game):
     death_eaters = sum(1 for v in game.villain_deck.current if v.name == "Death Eater")
     if death_eaters > 0:
         game.log(f"Damage increased to {death_eaters+1}💜 by Death Eater(s)")
-    game.heroes.all_heroes(game, lambda game, hero: hero.remove_health(game, 1 + death_eaters))
+    game.heroes.all_heroes.remove_health(game, 1 + death_eaters)
     game.locations.add_control(game)
 
 def imperio_effect(game):
@@ -212,7 +211,7 @@ def heir_of_slytherin_effect(game):
     die_result = random.choice("↯↯↯💰💜🃏")
     if die_result == "↯":
         game.log("Rolled ↯, ALL heroes lose 1💜")
-        game.heroes.all_heroes(game, lambda game, hero: hero.remove_health(game, 1))
+        game.heroes.all_heroes.remove_health(game, 1)
     elif die_result == "💰":
         game.log("Rolled 💰, adding 1💀 to the location")
         game.locations.add_control(game)
@@ -221,7 +220,7 @@ def heir_of_slytherin_effect(game):
         game.villain_deck.all_villains(game, lambda game, villain: villain.remove_damage(game, 1))
     elif die_result == "🃏":
         game.log("Rolled 🃏, ALL heroes discard a card")
-        game.heroes.all_heroes(game, lambda game, hero: hero.choose_and_discard(game))
+        game.heroes.all_heroes.choose_and_discard(game)
 
 def crucio_effect(game):
     game.heroes.active_hero.remove_health(game)
@@ -256,7 +255,7 @@ def legilimency_effect(game, hero):
 game_five_cards = [
     DarkArtsCard("Educational Decree", "Active hero loses 1💜 for each card with cost 4💰 or more in hand", decree_effect),
     DarkArtsCard("Educational Decree", "Active hero loses 1💜 for each card with cost 4💰 or more in hand", decree_effect),
-    DarkArtsCard("Legilimency", "ALL heroes reveal top card of deck, if spell discard it and lose 2💜", lambda game: game.heroes.all_heroes(game, legilimency_effect)),
+    DarkArtsCard("Legilimency", "ALL heroes reveal top card of deck, if spell discard it and lose 2💜", lambda game: game.heroes.all_heroes.effect(game, legilimency_effect)),
     DarkArtsCard("Morsmordre", "ALL heroes lose 1💜, add 1💀", morsmordre_effect),
     DarkArtsCard("Imperio", "Choose another hero to lose 2💜; reveal another card", imperio_effect),
     DarkArtsCard("Avada Kedavra", "Active hero loses 3💜, if stun add +1💀; reveal another card", avada_kedavra_effect),
@@ -268,13 +267,13 @@ def sectumsempra_effect(game, hero):
     hero.disallow_healing(game)
 
 game_six_cards = [
-    DarkArtsCard("Sectumsempra", "ALL heroes lose 2💜 and cannot gain 💜 this turn", lambda game: game.heroes.all_heroes(game, sectumsempra_effect)),
-    DarkArtsCard("Sectumsempra", "ALL heroes lose 2💜 and cannot gain 💜 this turn", lambda game: game.heroes.all_heroes(game, sectumsempra_effect)),
+    DarkArtsCard("Sectumsempra", "ALL heroes lose 2💜 and cannot gain 💜 this turn", lambda game: game.heroes.all_heroes.effect(game, sectumsempra_effect)),
+    DarkArtsCard("Sectumsempra", "ALL heroes lose 2💜 and cannot gain 💜 this turn", lambda game: game.heroes.all_heroes.effect(game, sectumsempra_effect)),
     DarkArtsCard("Morsmordre", "ALL heroes lose 1💜, add 1💀", morsmordre_effect),
 ]
 
 game_seven_cards = [
-    DarkArtsCard("Fiendfyre", "ALL heroes lose 3💜", lambda game: game.heroes.all_heroes(game, lambda game, hero: hero.remove_health(game, 3))),
+    DarkArtsCard("Fiendfyre", "ALL heroes lose 3💜", lambda game: game.heroes.all_heroes.remove_health(game, 3)),
     DarkArtsCard("Imperio", "Choose another hero to lose 2💜; reveal another card", imperio_effect),
     DarkArtsCard("Avada Kedavra", "Active hero loses 3💜, if stun add +1💀; reveal another card", avada_kedavra_effect),
     DarkArtsCard("Crucio", "Active hero loses 1💜; reveal another card", crucio_effect),

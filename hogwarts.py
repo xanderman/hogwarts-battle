@@ -134,7 +134,7 @@ class Spell(HogwartsCard):
 
 def hagrid_effect(game):
     game.heroes.active_hero.add_damage(game)
-    game.heroes.all_heroes(game, lambda game, hero: hero.add_health(game))
+    game.heroes.all_heroes.add_health(game)
 
 def sorting_hat_effect(game):
     game.heroes.active_hero.add_influence(game, 2)
@@ -186,8 +186,8 @@ game_one_cards = [
     Spell("Reparo", "Gain 2💰 or draw a card", 3, reparo_effect),
     Spell("Reparo", "Gain 2💰 or draw a card", 3, reparo_effect),
     Spell("Reparo", "Gain 2💰 or draw a card", 3, reparo_effect),
-    Spell("Lumos", "ALL heroes daw a card", 4, lambda game: game.heroes.all_heroes(game, lambda game, hero: hero.draw(game))),
-    Spell("Lumos", "ALL heroes daw a card", 4, lambda game: game.heroes.all_heroes(game, lambda game, hero: hero.draw(game))),
+    Spell("Lumos", "ALL heroes daw a card", 4, lambda game: game.heroes.all_heroes.draw(game)),
+    Spell("Lumos", "ALL heroes daw a card", 4, lambda game: game.heroes.all_heroes.draw(game)),
     Spell("Incendio", "Gain 1↯ and draw a card", 4, lambda game: game.heroes.active_hero.add(game, damage=1, cards=1)),
     Spell("Incendio", "Gain 1↯ and draw a card", 4, lambda game: game.heroes.active_hero.add(game, damage=1, cards=1)),
     Spell("Incendio", "Gain 1↯ and draw a card", 4, lambda game: game.heroes.active_hero.add(game, damage=1, cards=1)),
@@ -206,7 +206,7 @@ game_one_cards = [
     Item("Golden Snitch", "Gain 2💰 and draw a card", 5, lambda game: game.heroes.active_hero.add(game, influence=2, cards=1)),
     Ally("Oliver Wood", "Gain 1↯, if you defeat a Villain anyone gains 2💜", 3, oliver_effect),
     Ally("Rubeus Hagrid", "Gain 1↯; ALL heroes gain 1💜", 4, hagrid_effect),
-    Ally("Albus Dumbledore", "ALL heroes gain 1↯, 1💰, 1💜, and draw a card", 8, lambda game: game.heroes.all_heroes(game, lambda game, hero: hero.add(game, damage=1, influence=1, hearts=1, cards=1))),
+    Ally("Albus Dumbledore", "ALL heroes gain 1↯, 1💰, 1💜, and draw a card", 8, lambda game: game.heroes.all_heroes.add(game, damage=1, influence=1, hearts=1, cards=1)),
 ]
 
 def polyjuice_effect(game):
@@ -240,7 +240,7 @@ def fawkes_effect(game):
         case "d":
             game.heroes.active_hero.add_damage(game, 2)
         case "h":
-            game.heroes.all_heroes(game, lambda game, hero: hero.add_health(game, 2))
+            game.heroes.all_heroes.add_health(game, 2)
         case _:
             raise ValueError("Programmer Error! Invalid choice!")
 
@@ -265,9 +265,9 @@ game_two_cards = [
     Item("Nimbus 2001", "Gain 2↯; if you defeat a villain, gain 2💰", 5, level_two_broom_effect),
     Item("Nimbus 2001", "Gain 2↯; if you defeat a villain, gain 2💰", 5, level_two_broom_effect),
     Ally("Fawkes", "Gain 2↯ or ALL heroes gain 2💜", 5, fawkes_effect),
-    Ally("Molly Weasley", "ALL heroes gain 1💰 and 2💜", 6, lambda game: game.heroes.all_heroes(game, lambda game, hero: hero.add(game, influence=1, hearts=2))),
+    Ally("Molly Weasley", "ALL heroes gain 1💰 and 2💜", 6, lambda game: game.heroes.all_heroes.add(game, influence=1, hearts=2)),
     Ally("Dobby", "Remove 1💀 and draw a card", 4, dobby_effect),
-    Ally("Arthur Weasley", "ALL heroes gain 2💰", 6, lambda game: game.heroes.all_heroes(game, lambda game, hero: hero.add_influence(game, 2))),
+    Ally("Arthur Weasley", "ALL heroes gain 2💰", 6, lambda game: game.heroes.all_heroes.add_influence(game, 2)),
     Ally("Gilderoy Lockhart", "Draw a card, then discard a card; if discarded, draw a card", 2, lockhart_effect, discard_effect=lambda game, hero: hero.draw(game)),
     Ally("Ginny Weasley", "Gain 1↯ and 1💰", 4, lambda game: game.heroes.active_hero.add(game, damage=1, influence=1)),
 ]
@@ -286,14 +286,6 @@ def petrificus_effect(game):
     if choice == 'c':
         return
     game.villain_deck[choice].stun(game)
-
-def butterbeer_effect(game):
-    if len(game.heroes) <= 2:
-        game.heroes.all_heroes(game, lambda game, hero: hero.add(game, influence=1, hearts=1))
-        return
-    first = game.heroes.choose_hero(game, prompt="Choose first hero for butterbeer: ")
-    first.add(game, influence=1, hearts=1)
-    game.heroes.choose_hero(game, prompt="Choose second hero for butterbeer: ", disallow=first, disallow_msg="You already chose {}!").add(game, influence=1, hearts=1)
 
 def crystal_ball_effect(game):
     hero = game.heroes.active_hero
@@ -326,12 +318,12 @@ game_three_cards = [
     Item("Chocolate Frog", "One hero gains 1💰 and 1💜; if discarded, gain 1💰 and 1💜", 2, lambda game: game.heroes.choose_hero(game, prompt="Choose a hero to gain 1💰 and 1💜: ").add(game, influence=1, hearts=1), discard_effect=lambda game, hero: hero.add(game, influence=1, hearts=1)),
     Item("Chocolate Frog", "One hero gains 1💰 and 1💜; if discarded, gain 1💰 and 1💜", 2, lambda game: game.heroes.choose_hero(game, prompt="Choose a hero to gain 1💰 and 1💜: ").add(game, influence=1, hearts=1), discard_effect=lambda game, hero: hero.add(game, influence=1, hearts=1)),
     Item("Chocolate Frog", "One hero gains 1💰 and 1💜; if discarded, gain 1💰 and 1💜", 2, lambda game: game.heroes.choose_hero(game, prompt="Choose a hero to gain 1💰 and 1💜: ").add(game, influence=1, hearts=1), discard_effect=lambda game, hero: hero.add(game, influence=1, hearts=1)),
-    Item("Butterbeer", "Two heroes gain 1💰 and 1💜", 3, butterbeer_effect),
-    Item("Butterbeer", "Two heroes gain 1💰 and 1💜", 3, butterbeer_effect),
-    Item("Butterbeer", "Two heroes gain 1💰 and 1💜", 3, butterbeer_effect),
+    Item("Butterbeer", "Two heroes gain 1💰 and 1💜", 3, lambda game: game.heroes.choose_two_heroes(game, prompt="to gain 1💰 and 1💜").add(game, influence=1, hearts=1)),
+    Item("Butterbeer", "Two heroes gain 1💰 and 1💜", 3, lambda game: game.heroes.choose_two_heroes(game, prompt="to gain 1💰 and 1💜").add(game, influence=1, hearts=1)),
+    Item("Butterbeer", "Two heroes gain 1💰 and 1💜", 3, lambda game: game.heroes.choose_two_heroes(game, prompt="to gain 1💰 and 1💜").add(game, influence=1, hearts=1)),
     Item("Crystal Ball", "Draw two cards; discard one card", 3, crystal_ball_effect),
     Item("Crystal Ball", "Draw two cards; discard one card", 3, crystal_ball_effect),
-    Item("Marauder's Map", "Draw two cards; if discarded, ALL heroes draw a card", 5, lambda game: game.heroes.active_hero.draw(game, 2), discard_effect=lambda game, hero: game.heroes.all_heroes(game, lambda game, hero: hero.draw(game))),
+    Item("Marauder's Map", "Draw two cards; if discarded, ALL heroes draw a card", 5, lambda game: game.heroes.active_hero.draw(game, 2), discard_effect=lambda game, hero: game.heroes.all_heroes.draw(game)),
     Ally("Remus Lupin", "Gain 1↯, any hero gains 3💜", 4, lupin_effect),
     Ally("Sirius Black", "Gain 2↯ and 1💰", 6, lambda game: game.heroes.active_hero.add(game, damage=2, influence=1)),
     Ally("Sybill Trelawney", "Draw 2 cards; discard one card. If you discard a Spell, gain 2💰", 4, trelawny_effect),
@@ -369,11 +361,6 @@ def hogwarts_history_effect(game):
             game.roll_slytherin_die()
         case _:
             raise ValueError("Programmer Error! Invalid choice!")
-
-def pensieve_effect(game):
-    first = game.heroes.choose_hero(game, prompt="Choose first hero to gain 1💰 and draw a card: ")
-    first.add(game, influence=1, cards=1)
-    game.heroes.choose_hero(game, prompt="Choose second hero to gain 1💰 and draw a card: ", disallow=first).add(game, influence=1, cards=1)
 
 def snape_effect(game):
     game.heroes.active_hero.add(game, damage=1, hearts=2)
@@ -442,7 +429,7 @@ game_four_cards = [
     Item("Hogwarts: A History", "Roll any house die", 4, hogwarts_history_effect),
     Item("Hogwarts: A History", "Roll any house die", 4, hogwarts_history_effect),
     Item("Hogwarts: A History", "Roll any house die", 4, hogwarts_history_effect),
-    Item("Pensieve", "Two heroes gain 1💰 and draw a card", 5, pensieve_effect),
+    Item("Pensieve", "Two heroes gain 1💰 and draw a card", 5, lambda game: game.heroes.choose_two_heroes(game, prompt="to gain 1💰 and draw a card").add(game, influence=1, cards=1)),
     Item("Triwizard Cup", "Gain 1↯, 1💰, and 1💜", 5, lambda game: game.heroes.active_hero.add(game, damage=1, influence=1, hearts=1)),
     Ally("Severus Snape", "Gain 1↯ and 2💜; roll the Slytherin die", 6, snape_effect),
     FleurDelacour(),
@@ -508,9 +495,9 @@ def weasley_twin_effect(bonus):
                     game.log(f"{hero.name} has {card.name}, ALL heroes gain 1{bonus}")
                     match bonus:
                         case "💰":
-                            game.heroes.all_heroes(game, lambda game, hero: hero.add_influence(game, 1))
+                            game.heroes.all_heroes.add_influence(game, 1)
                         case "💜":
-                            game.heroes.all_heroes(game, lambda game, hero: hero.add_health(game, 1))
+                            game.heroes.all_heroes.add_health(game, 1)
                         case _:
                             raise ValueError("Programmer Error! Invalid bonus!")
                     return

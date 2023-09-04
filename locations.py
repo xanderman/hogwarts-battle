@@ -132,7 +132,7 @@ def graveyard_effect(game, hero):
 game_four_locations = [
     Location("Quidditch World Cup", 1, 6),
     Location("Triwizard Tournament", 2, 6),
-    Location("Graveyard", 2, 7, "ALL heroes discard an ally", lambda game: game.heroes.all_heroes(game, graveyard_effect)),
+    Location("Graveyard", 2, 7, "ALL heroes discard an ally", lambda game: game.heroes.all_heroes.effect(game, graveyard_effect)),
 ]
 
 def ministry_effect(game, hero):
@@ -152,7 +152,7 @@ def ministry_effect(game, hero):
 game_five_locations = [
     Location("Azkaban", 1, 7),
     Location("Hall of Prophecy", 2, 7),
-    Location("Ministry of Magic", 2, 7, "ALL heroes discard a spell", lambda game: game.heroes.all_heroes(game, ministry_effect)),
+    Location("Ministry of Magic", 2, 7, "ALL heroes discard a spell", lambda game: game.heroes.all_heroes.effect(game, ministry_effect)),
 ]
 
 def tower_effect(game, hero):
@@ -172,7 +172,7 @@ def tower_effect(game, hero):
 game_six_locations = [
     Location("Knockturn Alley", 1, 7),
     Location("The Burrow", 2, 7),
-    Location("Astronomy Tower", 3, 8, "ALL heroes discard an item", lambda game: game.heroes.all_heroes(game, tower_effect)),
+    Location("Astronomy Tower", 3, 8, "ALL heroes discard an item", lambda game: game.heroes.all_heroes.effect(game, tower_effect)),
 ]
 
 def castle_effect(game):
