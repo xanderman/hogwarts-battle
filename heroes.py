@@ -10,6 +10,15 @@ class QuitGame(Exception):
 class Heroes(object):
     def __init__(self, window, game_num, hero_names):
         self._window = window
+        self._heroes = [HEROES[name](game_num) for name in hero_names]
+        self._hero_rows = 2 if len(hero_names) > 2 else 1
+        self._harry = self._heroes[hero_names.index("Harry")] if "Harry" in hero_names else None
+        self._current = 0
+
+        self._init_window()
+        self._pads = [curses.newpad(100,100) for _ in self._heroes]
+
+    def _init_window(self):
         self._window.box()
         self._window.addstr(0, 1, "Heroes")
         beg = self._window.getbegyx()
@@ -19,17 +28,15 @@ class Heroes(object):
         self._pad_lines = end[0] - 1
         self._pad_cols = end[1]
         self._window.vline(1, self._pad_cols//2, curses.ACS_VLINE, self._pad_lines - 1)
-        if len(hero_names) > 2:
+        if self._hero_rows == 2:
             self._window.hline(self._pad_lines//2, 1, curses.ACS_HLINE, self._pad_cols - 2)
         self._window.noutrefresh()
 
-        self._heroes = [HEROES[name](game_num) for name in hero_names]
-        self._pads = [curses.newpad(100,100) for _ in self._heroes]
-        self._hero_rows = 2 if len(hero_names) > 2 else 1
-        self._harry = self._heroes[hero_names.index("Harry")] if "Harry" in hero_names else None
-        self._current = 0
-
-    def display_state(self):
+    def display_state(self, resize=False, size=None):
+        if resize:
+            self._window.resize(*size)
+            self._window.clear()
+            self._init_window()
         for i, hero in enumerate(self._heroes):
             attr = curses.A_BOLD | curses.color_pair(1) if i == self._current else curses.A_NORMAL
             hero.display_state(self._pads[i], i, attr)

@@ -7,17 +7,8 @@ import random
 class VillainDeck(object):
     def __init__(self, window, game_num):
         self._window = window
-        self._window.box()
-        self._window.addstr(0, 1, "Dark Arts Deck")
-        self._window.noutrefresh()
-        beg = self._window.getbegyx()
-        self._pad_start_line = beg[0] + 1
-        self._pad_start_col = beg[1] + 1
-        end = self._window.getmaxyx()
-        self._pad_end_line = self._pad_start_line + end[0] - 3
-        self._pad_end_col = self._pad_start_col + end[1] - 3
+        self._init_window()
         self._pad = curses.newpad(100, 100)
-
         self._deck = reduce(operator.add, VILLAINS[:game_num])
         self._max = MAX_VILLAINS[game_num]
         self._voldemort = None
@@ -31,7 +22,22 @@ class VillainDeck(object):
         random.shuffle(self._deck)
         self.current = []
 
-    def display_state(self):
+    def _init_window(self):
+        self._window.box()
+        self._window.addstr(0, 1, "Dark Arts Deck")
+        self._window.noutrefresh()
+        beg = self._window.getbegyx()
+        self._pad_start_line = beg[0] + 1
+        self._pad_start_col = beg[1] + 1
+        end = self._window.getmaxyx()
+        self._pad_end_line = self._pad_start_line + end[0] - 3
+        self._pad_end_col = self._pad_start_col + end[1] - 3
+
+    def display_state(self, resize=False, size=None):
+        if resize:
+            self._window.resize(*size)
+            self._window.clear()
+            self._init_window()
         self._window.clear()
         self._window.box()
         left_str = f"({len(self._deck)}"

@@ -3,6 +3,15 @@ import curses
 class Locations(object):
     def __init__(self, window, game_num):
         self._window = window
+        self._init_window()
+        self._pad = curses.newpad(100, 100)
+
+        self._locations = LOCATIONS[game_num]
+        self._current = 0
+        self._control_callbacks = []
+        self._control_remove_allowed = True
+
+    def _init_window(self):
         self._window.box()
         self._window.addstr(0, 1, "Locations")
         self._window.noutrefresh()
@@ -12,12 +21,6 @@ class Locations(object):
         end = self._window.getmaxyx()
         self._pad_end_line = self._pad_start_line + end[0] - 3
         self._pad_end_col = self._pad_start_col + end[1] - 3
-        self._pad = curses.newpad(100, 100)
-
-        self._locations = LOCATIONS[game_num]
-        self._current = 0
-        self._control_callbacks = []
-        self._control_remove_allowed = True
 
     @property
     def current(self):
@@ -29,7 +32,11 @@ class Locations(object):
             self.current._reveal(game)
         return self._current < len(self._locations)
 
-    def display_state(self):
+    def display_state(self, resize=False, size=None):
+        if resize:
+            self._window.resize(*size)
+            self._window.clear()
+            self._init_window()
         self._pad.clear()
         for i, location in enumerate(self._locations):
             attr = curses.A_BOLD | curses.color_pair(1) if i == self._current else curses.A_NORMAL

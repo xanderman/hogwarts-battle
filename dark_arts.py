@@ -7,6 +7,15 @@ import random
 class DarkArtsDeck(object):
     def __init__(self, window, game_num):
         self._window = window
+        self._init_window()
+        self._pad = curses.newpad(100, 100)
+
+        self._deck = reduce(operator.add, CARDS[:game_num])
+        random.shuffle(self._deck)
+        self._discard = []
+        self._played = []
+
+    def _init_window(self):
         self._window.box()
         self._window.addstr(0, 1, "Dark Arts Deck")
         self._window.noutrefresh()
@@ -16,14 +25,12 @@ class DarkArtsDeck(object):
         end = self._window.getmaxyx()
         self._pad_end_line = self._pad_start_line + end[0] - 3
         self._pad_end_col = self._pad_start_col + end[1] - 3
-        self._pad = curses.newpad(100, 100)
 
-        self._deck = reduce(operator.add, CARDS[:game_num])
-        random.shuffle(self._deck)
-        self._discard = []
-        self._played = []
-
-    def display_state(self):
+    def display_state(self, resize=False, size=None):
+        if resize:
+            self._window.resize(*size)
+            self._window.clear()
+            self._init_window()
         self._pad.clear()
         for i, card in enumerate(self._played):
             self._pad.addstr(f"{card.name}: {card.description}\n")

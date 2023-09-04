@@ -7,8 +7,16 @@ import operator
 import random
 
 class HogwartsDeck(object):
-    def __init__(self, window, game_num, market_size=6):
+    def __init__(self, window, game_num):
         self._window = window
+        self._init_window()
+        self._pad = curses.newpad(100, 100)
+        self._deck = reduce(operator.add, CARDS[:game_num])
+        self._max = 6
+        random.shuffle(self._deck)
+        self._market = defaultdict(list)
+
+    def _init_window(self):
         self._window.box()
         self._window.addstr(0, 1, "Market")
         self._window.noutrefresh()
@@ -18,14 +26,12 @@ class HogwartsDeck(object):
         end = self._window.getmaxyx()
         self._pad_end_line = self._pad_start_line + end[0] - 3
         self._pad_end_col = self._pad_start_col + end[1] - 3
-        self._pad = curses.newpad(100, 100)
 
-        self._deck = reduce(operator.add, CARDS[:game_num])
-        self._max = market_size
-        random.shuffle(self._deck)
-        self._market = defaultdict(list)
-
-    def display_state(self):
+    def display_state(self, resize=False, size=None):
+        if resize:
+            self._window.resize(*size)
+            self._window.clear()
+            self._init_window()
         self._pad.clear()
         for i, name in enumerate(self._market):
             card = self._market[name][0]

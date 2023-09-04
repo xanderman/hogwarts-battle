@@ -28,22 +28,13 @@ class Game(object):
         hogwarts_window = window.subwin(15, curses.COLS // 2, 7, curses.COLS // 2)
         self.hogwarts_deck = hogwarts.HogwartsDeck(hogwarts_window, game_num)
 
-        heroes_height = 40 if len(hero_names) > 2 else 20
-        self._heroes_window = window.subwin(heroes_height, curses.COLS, 22, 0)
+        self._heroes_height = 40 if len(hero_names) > 2 else 20
+        self._heroes_window = window.subwin(self._heroes_height, curses.COLS, 22, 0)
         self.heroes = heroes.Heroes(self._heroes_window, game_num, hero_names)
 
-        log_begin = 22 + heroes_height
+        log_begin = 22 + self._heroes_height
         self._log_window = window.subwin(curses.LINES - log_begin, curses.COLS, log_begin, 0)
-        self._log_window.box()
-        self._log_window.addstr(0, 1, "Log")
-        self._log_window.noutrefresh()
-        beg = self._log_window.getbegyx()
-        self._log_start_line = beg[0] + 1
-        self._log_start_col = beg[1] + 1
-        end = self._log_window.getmaxyx()
-        self._log_end_line = self._log_start_line + end[0] - 3
-        self._log_end_col = self._log_start_col + end[1] - 3
-        self._log_lines_to_show = self._log_end_line - self._log_start_line + 1
+        self._init_log_window()
         self._last_log_line = 0
         self._log_pad = curses.newpad(1000, 1000)
         self._log_pad.scrollok(True)
@@ -55,6 +46,34 @@ class Game(object):
 
         if self.heroes._harry:
             self.locations.add_control_callback(self, self.heroes._harry)
+
+    def _init_log_window(self):
+        self._log_window.box()
+        self._log_window.addstr(0, 1, "Log")
+        self._log_window.noutrefresh()
+        beg = self._log_window.getbegyx()
+        self._log_start_line = beg[0] + 1
+        self._log_start_col = beg[1] + 1
+        end = self._log_window.getmaxyx()
+        self._log_end_line = self._log_start_line + end[0] - 3
+        self._log_end_col = self._log_start_col + end[1] - 3
+        self._log_lines_to_show = self._log_end_line - self._log_start_line + 1
+
+    def display_state(self, resize=False):
+        if resize:
+            curses.update_lines_cols()
+            self._log_window.resize(curses.LINES - 22 - self._heroes_height, curses.COLS)
+            self._init_log_window()
+            self._refresh_log()
+
+            self.dark_arts_deck._window.mvwin(0, curses.COLS // 2)
+            self.hogwarts_deck._window.mvwin(7, curses.COLS // 2)
+        self.locations.display_state(resize=resize, size=(7, curses.COLS // 2))
+        self.dark_arts_deck.display_state(resize=resize, size=(7, curses.COLS // 2))
+        self.villain_deck.display_state(resize=resize, size=(15, curses.COLS // 2))
+        self.hogwarts_deck.display_state(resize=resize, size=(15, curses.COLS // 2))
+        self.heroes.display_state(resize=resize, size=(self._heroes_height, curses.COLS))
+        curses.doupdate()
 
     def input(self, message, valid_choices=None):
         if isinstance(valid_choices, range):
@@ -78,8 +97,7 @@ class Game(object):
                 if key in valid_choices:
                     break
             except curses.error:
-                # TODO not all subwindows handle screen resizes
-                self.display_state()
+                self.display_state(True)
         self._log_pad.addstr(key)
         return key
 
@@ -107,14 +125,6 @@ class Game(object):
 
     def _refresh_log(self):
         self._log_pad.refresh(max(self._last_shown_log_line - self._log_lines_to_show, 0),0, self._log_start_line,self._log_start_col, self._log_end_line,self._log_end_col)
-
-    def display_state(self):
-        self.locations.display_state()
-        self.dark_arts_deck.display_state()
-        self.villain_deck.display_state()
-        self.hogwarts_deck.display_state()
-        self.heroes.display_state()
-        curses.doupdate()
 
     def play_turn(self):
         self.display_state()
