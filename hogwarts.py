@@ -73,12 +73,13 @@ class HogwartsDeck(object):
 
 
 class HogwartsCard(object):
-    def __init__(self, name, description, cost, effect=lambda game: None, discard_effect=lambda game, hero: None):
+    def __init__(self, name, description, cost, effect=lambda game: None, discard_effect=lambda game, hero: None, rolls_house_die=False):
         self.name = name
         self.description = description
         self.cost = cost
         self.effect = effect
         self.discard_effect = discard_effect
+        self.rolls_house_die = rolls_house_die
 
     def display_state(self, window, i, count):
         window.addstr(f"{i}: ", curses.A_BOLD)
@@ -157,13 +158,10 @@ def reparo_effect(game):
     else:
         choice = game.input("Choose effect: (i)💰, (d)raw: ", "id")
 
-    match choice:
-        case "i":
-            game.heroes.active_hero.add_influence(game, 2)
-        case "d":
-            game.heroes.active_hero.draw(game)
-        case _:
-            raise ValueError("Programmer Error! Invalid choice!")
+    if choice == "i":
+        game.heroes.active_hero.add_influence(game, 2)
+    elif choice == "d":
+        game.heroes.active_hero.draw(game)
 
 def dittany_effect(game):
     if not game.heroes.healing_allowed:
@@ -180,7 +178,7 @@ def dittany_effect(game):
 
 def oliver_effect(game):
     game.heroes.active_hero.add_damage(game)
-    game.heroes.active_hero.add_extra_villain_reward(game, lambda game: game.heroes.choose_hero(game, prompt="Choose hero to gain 2💜: ").add_health(game, 2))
+    game.heroes.active_hero.add_extra_villain_reward(game, lambda game: game.heroes.choose_hero(game, prompt="Oliver Wood: Villain defeated! Choose hero to gain 2💜: ").add_health(game, 2))
 
 game_one_cards = [
     Spell("Wingardium Leviosa", "Gain 1💰, may put acquired Items on top of deck", 2, wingardium_effect),
@@ -232,6 +230,7 @@ def polyjuice_effect(game):
             continue
         game.log(f"Copying {card.name}")
         card.effect(game)
+        break
 
 def level_two_broom_effect(game):
     game.heroes.active_hero.add_damage(game, 2)
@@ -242,13 +241,11 @@ def fawkes_effect(game):
         game.log("Healing not allowed, gaining 2↯")
         game.heroes.active_hero.add_damage(game, 2)
         return
-    match game.input("Choose effect: (d)↯, (h)💜: ", "dh"):
-        case "d":
-            game.heroes.active_hero.add_damage(game, 2)
-        case "h":
-            game.heroes.all_heroes.add_health(game, 2)
-        case _:
-            raise ValueError("Programmer Error! Invalid choice!")
+    choice = game.input("Choose effect: (d)↯, (h)💜: ", "dh")
+    if choice == "d":
+        game.heroes.active_hero.add_damage(game, 2)
+    elif choice == "h":
+        game.heroes.all_heroes.add_health(game, 2)
 
 def dobby_effect(game):
     game.locations.remove_control(game)
@@ -356,17 +353,14 @@ def accio_effect(game):
 
 def hogwarts_history_effect(game):
     choice = game.input(f"Choose house die to roll, (g)ryffindor, (h)ufflepuff, (r)avenclaw, (s)lytherin: ", "ghrs")
-    match choice:
-        case "g":
-            game.roll_gryffindor_die()
-        case "h":
-            game.roll_hufflepuff_die()
-        case "r":
-            game.roll_ravenclaw_die()
-        case "s":
-            game.roll_slytherin_die()
-        case _:
-            raise ValueError("Programmer Error! Invalid choice!")
+    if choice == "g":
+        game.roll_gryffindor_die()
+    elif choice == "h":
+        game.roll_hufflepuff_die()
+    elif choice == "r":
+        game.roll_ravenclaw_die()
+    elif choice == "s":
+        game.roll_slytherin_die()
 
 def snape_effect(game):
     game.heroes.active_hero.add(game, damage=1, hearts=2)
@@ -429,22 +423,22 @@ game_four_cards = [
     Spell("Protego", "Gain 1↯ and 1💜; if discarded, gain 1↯ and 1💜", 5, lambda game: game.heroes.active_hero.add(game, damage=1, hearts=1), discard_effect=lambda game, hero: hero.add(game, damage=1, hearts=1)),
     Spell("Protego", "Gain 1↯ and 1💜; if discarded, gain 1↯ and 1💜", 5, lambda game: game.heroes.active_hero.add(game, damage=1, hearts=1), discard_effect=lambda game, hero: hero.add(game, damage=1, hearts=1)),
     Spell("Protego", "Gain 1↯ and 1💜; if discarded, gain 1↯ and 1💜", 5, lambda game: game.heroes.active_hero.add(game, damage=1, hearts=1), discard_effect=lambda game, hero: hero.add(game, damage=1, hearts=1)),
-    Item("Hogwarts: A History", "Roll any house die", 4, hogwarts_history_effect),
-    Item("Hogwarts: A History", "Roll any house die", 4, hogwarts_history_effect),
-    Item("Hogwarts: A History", "Roll any house die", 4, hogwarts_history_effect),
-    Item("Hogwarts: A History", "Roll any house die", 4, hogwarts_history_effect),
-    Item("Hogwarts: A History", "Roll any house die", 4, hogwarts_history_effect),
-    Item("Hogwarts: A History", "Roll any house die", 4, hogwarts_history_effect),
+    Item("Hogwarts: A History", "Roll any house die", 4, hogwarts_history_effect, rolls_house_die=True),
+    Item("Hogwarts: A History", "Roll any house die", 4, hogwarts_history_effect, rolls_house_die=True),
+    Item("Hogwarts: A History", "Roll any house die", 4, hogwarts_history_effect, rolls_house_die=True),
+    Item("Hogwarts: A History", "Roll any house die", 4, hogwarts_history_effect, rolls_house_die=True),
+    Item("Hogwarts: A History", "Roll any house die", 4, hogwarts_history_effect, rolls_house_die=True),
+    Item("Hogwarts: A History", "Roll any house die", 4, hogwarts_history_effect, rolls_house_die=True),
     Item("Pensieve", "Two heroes gain 1💰 and draw a card", 5, lambda game: game.heroes.choose_two_heroes(game, prompt="to gain 1💰 and draw a card").add(game, influence=1, cards=1)),
     Item("Triwizard Cup", "Gain 1↯, 1💰, and 1💜", 5, lambda game: game.heroes.active_hero.add(game, damage=1, influence=1, hearts=1)),
-    Ally("Severus Snape", "Gain 1↯ and 2💜; roll the Slytherin die", 6, snape_effect),
+    Ally("Severus Snape", "Gain 1↯ and 2💜; roll the Slytherin die", 6, snape_effect, rolls_house_die=True),
     FleurDelacour(),
-    Ally("Filius Flitwick", "Gain 1💰 and draw a card; roll the Ravenclaw die", 6, flitwick_effect),
-    Ally("Cedric Diggory", "Gain 1↯; roll the Hufflepuff die", 4, diggory_effect),
+    Ally("Filius Flitwick", "Gain 1💰 and draw a card; roll the Ravenclaw die", 6, flitwick_effect, rolls_house_die=True),
+    Ally("Cedric Diggory", "Gain 1↯; roll the Hufflepuff die", 4, diggory_effect, rolls_house_die=True),
     Ally("Viktor Krum", "Gain 2↯, if you defeat a Villain gain 1💰 and 1💜", 5, krum_effect),
     Ally("Mad-eye Moody", "Gain 2💰, remove 1💀", 6, moody_effect),
-    Ally("Minerva McGonagall", "Gain 1💰 and 1↯; roll the Gryffindor die", 6, mcgonagall_effect),
-    Ally("Pomona Sprout", "Gain 1💰; anyone gains 2💜; roll the Hufflepuff die", 6, sprout_effect),
+    Ally("Minerva McGonagall", "Gain 1💰 and 1↯; roll the Gryffindor die", 6, mcgonagall_effect, rolls_house_die=True),
+    Ally("Pomona Sprout", "Gain 1💰; anyone gains 2💜; roll the Hufflepuff die", 6, sprout_effect, rolls_house_die=True),
 ]
 
 def stupefy_effect(game):
@@ -481,13 +475,12 @@ def tonks_effect(game):
     else:
         choice = game.input("Rmoving 💀 not allowed! Choose to (i) gain 3💰, (d) gain 2↯: ", "id")
 
-    match choice:
-        case "i":
-            game.heroes.active_hero.add_influence(game, 3)
-        case "d":
-            game.heroes.active_hero.add_damage(game, 2)
-        case "c":
-            game.locations.remove_control(game)
+    if choice == "i":
+        game.heroes.active_hero.add_influence(game, 3)
+    elif choice == "d":
+        game.heroes.active_hero.add_damage(game, 2)
+    elif choice == "c":
+        game.locations.remove_control(game)
 
 def weasley_twin_effect(bonus):
     def effect(game):
@@ -499,13 +492,10 @@ def weasley_twin_effect(bonus):
             for card in hero._hand:
                 if 'Weasley' in card.name:
                     game.log(f"{hero.name} has {card.name}, ALL heroes gain 1{bonus}")
-                    match bonus:
-                        case "💰":
-                            game.heroes.all_heroes.add_influence(game, 1)
-                        case "💜":
-                            game.heroes.all_heroes.add_health(game, 1)
-                        case _:
-                            raise ValueError("Programmer Error! Invalid bonus!")
+                    if bonus == "💰":
+                        game.heroes.all_heroes.add_influence(game, 1)
+                    elif bonus == "💜":
+                        game.heroes.all_heroes.add_health(game, 1)
                     return
     return effect
 
@@ -550,28 +540,106 @@ game_five_cards = [
     Owls(),
     Owls(),
     Ally("Nymphadora Tonks", "Gain 3💰 or 2↯, or remove 1💀", 5, tonks_effect),
-    Ally("Fred Weasley", "Gain 1↯; if another hero has a Weasley, ALL heroes gain 1💰; roll the Gryffindor die", 4, weasley_twin_effect("💰")),
-    Ally("George Weasley", "Gain 1↯; if another hero has a Weasley, ALL heroes gain 1💜; roll the Gryffindor die", 4, weasley_twin_effect("💜")),
-    Ally("Cho Chang", "Draw three cards, discard two; roll the Ravenclaw die", 4, cho_effect),
+    Ally("Fred Weasley", "Gain 1↯; if another hero has a Weasley, ALL heroes gain 1💰; roll the Gryffindor die", 4, weasley_twin_effect("💰"), rolls_house_die=True),
+    Ally("George Weasley", "Gain 1↯; if another hero has a Weasley, ALL heroes gain 1💜; roll the Gryffindor die", 4, weasley_twin_effect("💜"), rolls_house_die=True),
+    Ally("Cho Chang", "Draw three cards, discard two; roll the Ravenclaw die", 4, cho_effect, rolls_house_die=True),
     LunaAlly(),
     Ally("Kingsley Shacklebolt", "Gain 2↯ and 1💜, remove 1💀", 7, kingsley_effect),
 ]
 
+class Confundus(Spell):
+    def __init__(self):
+        super().__init__("Confundus", "Gain 1↯; if you damage each Villian, remove 1💀", 3, self.__effect)
+
+    def __effect(self, game):
+        game.heroes.active_hero.add_damage(game)
+        if all([villain.took_damage for villain in game.villain_deck.all_villains]):
+            game.log(f"Already damaged all villains, {self.name} removes 1💀")
+            game.locations.remove_control(game)
+            return
+        self._used_ability = False
+        game.heroes.active_hero.add_extra_damage_effect(game, self.__extra_effect)
+
+    def __extra_effect(self, game):
+        if all([villain.took_damage for villain in game.villain_deck.all_villains]) and not self._used_ability:
+            game.log(f"Damaged all villains, {self.name} removes 1💀")
+            game.locations.remove_control(game)
+            self._used_ability = True
+
+def bezoar_effect(game):
+    if not game.heroes.healing_allowed:
+        game.log("Healing not allowed!")
+    else:
+        game.heroes.choose_hero(game, prompt="Choose hero to gain 3💜: ").add_health(game, 3)
+    game.heroes.active_hero.draw(game)
+
+def advanced_potion_effect(game):
+    game.heroes.all_heroes.add_health(game, 2)
+    for hero in game.heroes:
+        if hero._health == hero._max_health:
+            game.log(f"{hero.name} at max health, gaining 1↯ and drawing a card")
+            hero.add(game, damage=1, cards=1)
+
+def felix_effect(game):
+    first = game.input(f"Choose (d) 2↯, (i) 2💰, (h) 2💜, or (c) draw 2 cards: ", "dihc")
+    if first == 'd':
+        game.heroes.active_hero.add_damage(game, 2)
+        second = game.input(f"Choose (i) 2💰, (h) 2💜, or (c) draw 2 cards: ", "ihc")
+    elif first == 'i':
+        game.heroes.active_hero.add_influence(game, 2)
+        second = game.input(f"Choose (d) 2↯, (h) 2💜, or (c) draw 2 cards: ", "dhc")
+    elif first == 'h':
+        game.heroes.active_hero.add_health(game, 2)
+        second = game.input(f"Choose (d) 2↯, (i) 2💰, or (c) draw 2 cards: ", "dic")
+    elif first == 'c':
+        game.heroes.active_hero.draw(game, 2)
+        second = game.input(f"Choose (d) 2↯, (i) 2💰, (h) 2💜: ", "dih")
+
+    if second == 'd':
+        game.heroes.active_hero.add_damage(game, 2)
+    elif second == 'i':
+        game.heroes.active_hero.add_influence(game, 2)
+    elif second == 'h':
+        game.heroes.active_hero.add_health(game, 2)
+    elif second == 'c':
+        game.heroes.active_hero.draw(game, 2)
+
+def add_if_spell(game, card):
+    if card.is_spell():
+        game.log(f"Spell {card.name} played, elder wand adds 1↯ and 1💜")
+        game.heroes.active_hero.add(game, damage=1, hearts=1)
+
+def elder_wand_effect(game):
+    for card in game.heroes.active_hero._play_area:
+        if card.is_spell():
+            game.log(f"Spell {card.name} already played, elder wand adds 1↯ and 1💜")
+            game.heroes.active_hero.add(game, damage=1, hearts=1)
+    game.heroes.active_hero.add_extra_card_effect(game, add_if_spell)
+
+def slughorn_effect(game):
+    game.heroes.all_heroes.add(game, influence=1, hearts=1)
+    game.roll_slytherin_die()
+
 game_six_cards = [
-    Spell("Confundus", "Gain 1↯; if you damage each Villian, remove 1💀", 3),
-    Spell("Confundus", "Gain 1↯; if you damage each Villian, remove 1💀", 3),
-    Item("Bezoar", "One hero gains 3💜; draw a card", 4),
-    Item("Bezoar", "One hero gains 3💜; draw a card", 4),
+    Confundus(),
+    Confundus(),
+    Item("Bezoar", "One hero gains 3💜; draw a card", 4, bezoar_effect),
+    Item("Bezoar", "One hero gains 3💜; draw a card", 4, bezoar_effect),
     Item("Deluminator", "Remove 2💀", 6, lambda game: game.locations.remove_control(game, 2)),
-    Item("Advanced Potion-Making", "ALL heroes gain 2💜; each hero at max gains 1↯ and draws a card", 6),
-    Item("Felix Felicis", "Choose 2: gain 2↯, 2💰, 2💜, draw two cards", 7),
-    Item("Felix Felicis", "Choose 2: gain 2↯, 2💰, 2💜, draw two cards", 7),
-    Item("Elder Wand", "For each Spell played gain 1↯ and 1💜", 7),
-    Ally("Horace Slughorn", "ALL heroes gain 1💰 or 1💜; roll the Slytherin die", 6),
+    Item("Advanced Potion-Making", "ALL heroes gain 2💜; each hero at max gains 1↯ and draws a card", 6, advanced_potion_effect),
+    Item("Felix Felicis", "Choose 2: gain 2↯, 2💰, 2💜, draw two cards", 7, felix_effect),
+    Item("Felix Felicis", "Choose 2: gain 2↯, 2💰, 2💜, draw two cards", 7, felix_effect),
+    Item("Elder Wand", "For each Spell played gain 1↯ and 1💜", 7, elder_wand_effect),
+    Ally("Horace Slughorn", "ALL heroes gain 1💰 or 1💜; roll the Slytherin die", 6, slughorn_effect, rolls_house_die=True),
 ]
 
+def sword_effect(game):
+    game.heroes.active_hero.add_damage(game, 2)
+    game.roll_gryffindor_die()
+    game.roll_gryffindor_die()
+
 game_seven_cards = [
-    Item("Sword of Gryffindor", "Gain 2↯; Roll the Gryffindor die twice", 7)
+    Item("Sword of Gryffindor", "Gain 2↯; Roll the Gryffindor die twice", 7, sword_effect, rolls_house_die=True)
 ]
 
 monster_box_one_cards = [

@@ -216,6 +216,8 @@ def avada_kedavra_effect(game):
 
 def heir_of_slytherin_effect(game):
     die_result = random.choice("↯↯↯💰💜🃏")
+    if game.heroes.active_hero._proficiency.can_reroll_house_dice and game.input(f"Rolled {die_result}, (a)ccept or (r)eroll?", "ar") == "r":
+        die_result = random.choice("↯↯↯💰💜🃏")
     if die_result == "↯":
         game.log("Rolled ↯, ALL heroes lose 1💜")
         game.heroes.all_heroes.remove_health(game, 1)
@@ -224,7 +226,7 @@ def heir_of_slytherin_effect(game):
         game.locations.add_control(game)
     elif die_result == "💜":
         game.log("Rolled 💜, ALL Villains remove one ↯")
-        game.villain_deck.all_villains(game, lambda game, villain: villain.remove_damage(game, 1))
+        game.villain_deck.all_villains.remove_damage(game, 1)
     elif die_result == "🃏":
         game.log("Rolled 🃏, ALL heroes discard a card")
         game.heroes.all_heroes.choose_and_discard(game)
@@ -236,7 +238,7 @@ def crucio_effect(game):
 game_four_cards = [
     DarkArtsCard("Morsmordre", "ALL heroes lose 1💜, add 1💀", morsmordre_effect),
     DarkArtsCard("Morsmordre", "ALL heroes lose 1💜, add 1💀", morsmordre_effect),
-    DarkArtsCard("Regeneration", "Remove 2↯ from ALL Villains", lambda game: game.villain_deck.all_villains(game, lambda game, villain: villain.remove_damage(game, 2))),
+    DarkArtsCard("Regeneration", "Remove 2↯ from ALL Villains", lambda game: game.villain_deck.all_villains.remove_damage(game, 2)),
     DarkArtsCard("Imperio", "Choose another hero to lose 2💜; reveal another card", imperio_effect),
     DarkArtsCard("Avada Kedavra", "Active hero loses 3💜, if stun add +1💀; reveal another card", avada_kedavra_effect),
     DarkArtsCard("Heir of Slytherin", "Roll the Slytherin die", heir_of_slytherin_effect),

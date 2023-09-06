@@ -11,9 +11,10 @@ import dark_arts
 import villains
 import hogwarts
 import heroes
+import proficiencies
 
 class Game(object):
-    def __init__(self, window, game_num, hero_names):
+    def __init__(self, window, game_num, chosen_heroes):
         self._window = window
         self._window.noutrefresh()
         locations_window = window.subwin(7, curses.COLS // 2, 0, 0)
@@ -28,9 +29,9 @@ class Game(object):
         hogwarts_window = window.subwin(15, curses.COLS // 2, 7, curses.COLS // 2)
         self.hogwarts_deck = hogwarts.HogwartsDeck(hogwarts_window, game_num)
 
-        self._heroes_height = 40 if len(hero_names) > 2 else 20
+        self._heroes_height = 40 if len(chosen_heroes) > 2 else 20
         self._heroes_window = window.subwin(self._heroes_height, curses.COLS, 22, 0)
-        self.heroes = heroes.Heroes(self._heroes_window, game_num, hero_names)
+        self.heroes = heroes.Heroes(self._heroes_window, game_num, chosen_heroes)
 
         log_begin = 22 + self._heroes_height
         self._log_window = window.subwin(curses.LINES - log_begin, curses.COLS, log_begin, 0)
@@ -166,6 +167,8 @@ class Game(object):
 
     def _roll_die(self, options):
         die_result = random.choice(options)
+        if self.heroes.active_hero._proficiency.can_reroll_house_dice and game.input(f"Rolled {die_result}, (a)ccept or (r)eroll?", "ar") == "r":
+            die_result = random.choice(options)
         if die_result == "↯":
             self.log("Rolled ↯, ALL heroes gain 1↯")
             self.heroes.all_heroes.add_damage(self, 1)
@@ -180,7 +183,7 @@ class Game(object):
             self.heroes.all_heroes.draw(self)
 
 
-def main(stdscr, game_num, hero_names):
+def main(stdscr, game_num, chosen_heroes):
     # For active hero & location, and input prompts
     curses.init_pair(1, curses.COLOR_GREEN, curses.COLOR_BLACK)
     # For spells
@@ -189,7 +192,7 @@ def main(stdscr, game_num, hero_names):
     curses.init_pair(3, curses.COLOR_CYAN, curses.COLOR_BLACK)
     # For items
     curses.init_pair(4, curses.COLOR_YELLOW, curses.COLOR_BLACK)
-    game = Game(stdscr, game_num, hero_names)
+    game = Game(stdscr, game_num, chosen_heroes)
     while True:
         try:
             game.play_turn()
@@ -202,17 +205,45 @@ def main(stdscr, game_num, hero_names):
         if game.locations.is_controlled(game) and not game.locations.advance(game):
             return False
 
+class HeroArgAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        if len(values) > 4:
+            parser.error("Cannot play with more than 4 heroes")
+        game_num = namespace.game_num
+        chosen_heroes = []
+        for hero_name in values:
+            parts = hero_name.split(":")
+            if game_num < 6 and len(parts) > 1:
+                parser.error(f"Proficiencies cannot be used in game {game_num}")
+            if game_num >= 6 and len(parts) == 1:
+                parser.error(f"Proficiencies must be specified in game {game_num}")
+            if len(parts) > 2:
+                parser.error(f"Heroes must be specified as 'NAME' or 'NAME:PROFICIENCY'")
+
+            hero_name = parts[0]
+            if hero_name not in heroes.HEROES:
+                parser.error(f"Unknown hero: {hero_name}")
+
+            if len(parts) == 2:
+                proficiency_name = parts[1]
+                if proficiency_name not in proficiencies.PROFICIENCIES:
+                    parser.error(f"Unknown proficiency: {proficiency_name}")
+                proficiency = proficiencies.PROFICIENCIES[proficiency_name]()
+            else:
+                proficiency = proficiencies.NullProficiency()
+            chosen_heroes.append(heroes.HEROES[hero_name](game_num, proficiency))
+        setattr(namespace, self.dest, chosen_heroes)
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Play Harry Potter: Hogwarts Battle")
-    parser.add_argument("game_num", type=int, choices=range(1, 8))
-    parser.add_argument("heroes", nargs="+", choices=heroes.HEROES.keys())
-    # TODO this was suggested by copilot, and looks interesting
-    parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("game_num", metavar="GAME", type=int, choices=range(1, 8),
+                        help="Game number to play, 1-7")
+    parser.add_argument("heroes", metavar="HERO", nargs="+", action=HeroArgAction,
+                        help=f"""Hero to play, min 1, max 4. For games 6 and up, specify as NAME:PROFICIENCY.
+                        Valid names are {', '.join(heroes.HEROES.keys())}. Valid
+                        proficiencies are {', '.join(proficiencies.PROFICIENCIES.keys())}.""")
+    parser.add_argument("--seed", type=int, default=None, help="Random seed to use")
     args = parser.parse_args()
-
-    if len(args.heroes) > 4:
-        print("Cannot play with more than 4 heroes")
-        exit(1)
 
     seed = args.seed
     if seed is None:

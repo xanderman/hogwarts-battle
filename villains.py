@@ -63,13 +63,10 @@ class VillainDeck(object):
 
     def play_turn(self, game):
         game.log("-----Villain phase-----")
-        for villain in self.current:
-            villain.play_turn(game)
-        if self.voldemort_active():
-            self._voldemort.play_turn(game)
+        self.all_villains.play_turn(game)
 
     def reveal(self, game):
-        for villain in self.current:
+        for villain in self.all_villains:
             villain.took_damage = False
         while len(self.current) < self._max and len(self._deck) > 0:
             death_eaters = sum(1 for v in game.villain_deck.current if v.name == "Death Eater")
@@ -102,11 +99,26 @@ class VillainDeck(object):
             return self._voldemort
         return self.current[int(key)]
 
-    def all_villains(self, game, effect):
-        for villain in self.current:
-            effect(game, villain)
+    @property
+    def all_villains(self):
         if self.voldemort_active():
-            effect(game, self._voldemort)
+            return VillainList(*self.current, self._voldemort)
+        return VillainList(*self.current)
+
+
+class VillainList(list):
+    def __init__(self, *args):
+        super().__init__(args)
+
+    def __getattr__(self, attr):
+        def f(game, *args, **kwargs):
+            for villain in self:
+                getattr(villain, attr)(game, *args, **kwargs)
+        return f
+
+    def effect(self, game, effect=lambda game, villain: None):
+        for villain in self:
+            effect(game, villain)
 
 
 class Villain(object):
@@ -136,7 +148,7 @@ class Villain(object):
 
     def play_turn(self, game):
         if self._stunned:
-            game.log(f"{self.name} is stunned!")
+            game.log(f"Villain: {self.name} ({self._damage}/{self._health}) is stunned!")
             if game.heroes.active_hero == self._stunned_by:
                 game.log(f"{self.name} was stunned by {self._stunned_by.name}, so recovers")
                 self._stunned = False
@@ -241,7 +253,7 @@ class Lucius(Villain):
             return
         game.log(f"{self.name}: {amount}💀 added, all Villains heal 1↯ for each")
         for _ in range(amount):
-            game.villain_deck.all_villains(game, lambda game, villain: villain.remove_damage(game, 1))
+            game.villain_deck.all_villains.remove_damage(game, 1)
 
     def __reward(self, game):
         game.locations.remove_control_callback(game, self)
@@ -410,7 +422,7 @@ def bellatrix_per_hero(game, hero):
     if len(items) == 0:
         game.log(f"{hero.name} has no items in discard")
         return
-    game.log(f"Items in {hero.name}'s discard: {items_str}")
+    game.log(f"Items in {hero.name}'s discard:")
     for i, item in enumerate(items):
         game.log(f" {i}: {item}")
     # TODO allow to skip?
@@ -437,11 +449,13 @@ game_six_villains = [
 
 class GameSixVoldemort(Villain):
     def __init__(self):
-        super().__init__("Lord Voldemort", "Active hero loses 1💜 and discards a card",
+        super().__init__("Lord Voldemort", "Roll the Slytherin die",
                          "You win!", 15, effect=self.__effect)
 
     def __effect(self, game):
         die_result = random.choice("↯↯↯💰💜🃏")
+        if game.heroes.active_hero._proficiency.can_reroll_house_dice and game.input(f"Rolled {die_result}, (a)ccept or (r)eroll?", "ar") == "r":
+            die_result = random.choice("↯↯↯💰💜🃏")
         if die_result == "↯":
             game.log("Rolled ↯, ALL heroes lose 1💜")
             game.heroes.all_heroes.remove_health(game, 1)
@@ -450,7 +464,7 @@ class GameSixVoldemort(Villain):
             game.locations.add_control(game)
         elif die_result == "💜":
             game.log("Rolled 💜, ALL Villains heal 1↯")
-            game.villain_deck.all_villains(lambda game, villain: villain.remove_damage(game, 1))
+            game.villain_deck.all_villains.remove_damage(game, 1)
         elif die_result == "🃏":
             game.log("Rolled 🃏, ALL heroes discard a card")
             game.heroes.all_heroes.choose_and_discard(game)

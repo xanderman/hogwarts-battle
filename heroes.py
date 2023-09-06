@@ -8,11 +8,11 @@ class QuitGame(Exception):
 
 
 class Heroes(object):
-    def __init__(self, window, game_num, hero_names):
+    def __init__(self, window, game_num, chosen_heroes):
         self._window = window
-        self._heroes = [HEROES[name](game_num) for name in hero_names]
-        self._hero_rows = 2 if len(hero_names) > 2 else 1
-        self._harry = self._heroes[hero_names.index("Harry")] if "Harry" in hero_names else None
+        self._heroes = chosen_heroes
+        self._hero_rows = 2 if len(self._heroes) > 2 else 1
+        self._harry = next((hero for hero in self._heroes if hero.name == "Harry"), None)
         self._current = 0
 
         self._init_window()
@@ -196,7 +196,7 @@ class HeroList(list):
 
 
 class Hero(object):
-    def __init__(self, name, game_num, starting_deck):
+    def __init__(self, name, game_num, starting_deck, proficiency):
         self.name = name
         self._game_num = game_num
         self._max_health = 10
@@ -205,6 +205,7 @@ class Hero(object):
         self._hand = []
         self._play_area = []
         self._discard = starting_deck
+        self._proficiency = proficiency
         self._damage_tokens = 0
         self._influence_tokens = 0
         self._cards_acquired = 0
@@ -221,12 +222,15 @@ class Hero(object):
         self._only_one_damage = False
         self._extra_villain_rewards = []
         self._extra_card_effects = []
+        self._extra_damage_effects = []
+        self._proficiency.start_game(self)
 
     def display_state(self, window, i, attr):
         window.clear()
         window.addstr(f"{i}: {self.name} ({self._health}/{self._max_health}💜) -- Deck: {len(self._deck)}, Discard: {len(self._discard)}\n", attr)
         if self.ability_description is not None:
             window.addstr(f"{self.ability_description}\n")
+        self._proficiency.display_state(window)
         window.addstr(f"  {self._damage_tokens}↯, {self._influence_tokens}💰\n")
         window.addstr(f"  Hand ({len(self._hand)} cards):\n")
         for i, card in enumerate(self._hand):
@@ -234,7 +238,7 @@ class Hero(object):
             card.display_name(window, curses.A_BOLD)
             window.addstr(f"\n        {card.description}\n")
         if len(self._play_area) != 0:
-            window.addstr("  Play area ({len(self._play_area)} cards):\n")
+            window.addstr(f"  Play area ({len(self._play_area)} cards):\n")
             for i, card in enumerate(self._play_area):
                 window.addstr(f"    {i}: ", curses.A_BOLD)
                 card.display_name(window, curses.A_BOLD)
@@ -285,8 +289,9 @@ class Hero(object):
             self._influence_tokens = 0
             self.choose_and_discard(game, len(self._hand) // 2)
         if health_start != self._health:
+            health_gained = self._health - health_start
             for callback in self._health_callbacks:
-                callback.health_callback(game, self, self._health - health_start)
+                callback.health_callback(game, self, health_gained)
 
     def remove_health(self, game, amount=1):
         self.add_health(game, -amount)
@@ -418,6 +423,7 @@ class Hero(object):
         choice = game.hogwarts_deck[int(choice)]
         game.log(f"Buying {choice.name} ({choice.cost}💰; {choice.description})")
         cost = choice.cost
+        cost += self._proficiency.cost_modifier(game, choice)
         if self._influence_tokens < cost:
             game.log("Not enough 💰!")
             return
@@ -431,6 +437,9 @@ class Hero(object):
 
     def add_extra_card_effect(self, game, effect):
         self._extra_card_effects.append(effect)
+
+    def add_extra_damage_effect(self, game, effect):
+        self._extra_damage_effects.append(effect)
 
     def play_card(self, game, which):
         card = self._hand.pop(which)
@@ -487,6 +496,8 @@ class Hero(object):
                 reward(game)
             # Extra rewards only apply once
             self._extra_villain_rewards = []
+        for callback in self._extra_damage_effects:
+            callback(game)
         return villain
 
     def add_influence(self, game, amount=1):
@@ -512,30 +523,40 @@ class Hero(object):
 
     def play_turn(self, game):
         game.log(f"-----{self.name}'s turn-----")
+        self._proficiency.start_turn(game)
         while True:
             game.display_state()
-            match game.input("Select (p)lay card, (a)ssign ↯, (b)uy card, (e)nd turn, or (q)uit: ", "pabeq"):
-                case "p":
-                    self.choose_and_play(game)
-                case "a":
-                    self.assign_damage(game)
-                case "b":
-                    self.buy_card(game)
-                case "e":
-                    return
-                case "q":
-                    raise QuitGame()
-                case "debug":
-                    # TODO reimplement
-                    self.display_state()
-                    game.log("Discard:")
-                    for card in self._discard:
-                        game.log(f"\t{card}")
-                    game.log("Deck:")
-                    for card in self._deck:
-                        game.log(f"\t{card}")
-                case _:
-                    game.log("Invalid action!")
+            actions = ["p", "a", "b", "e", "q"]
+            prompt = "Select (p)lay card, (a)ssign ↯, (b)uy card, (e)nd turn, or (q)uit: "
+            if self._proficiency.turn_action is not None:
+                p_action = self._proficiency.turn_action
+                actions.append(p_action[0])
+                prompt = f"Select (p)lay card, (a)ssign ↯, (b)uy card, {p_action[1]}, (e)nd turn, or (q)uit: "
+
+            action = game.input(prompt, actions)
+            if action == "p":
+                self.choose_and_play(game)
+            elif action == "a":
+                self.assign_damage(game)
+            elif action == "b":
+                self.buy_card(game)
+            elif action == "e":
+                return
+            elif action == "q":
+                raise QuitGame()
+            elif action == p_action[0]:
+                p_action[2](game)
+            elif action == "debug":
+                # TODO reimplement
+                self.display_state()
+                game.log("Discard:")
+                for card in self._discard:
+                    game.log(f"\t{card}")
+                game.log("Deck:")
+                for card in self._deck:
+                    game.log(f"\t{card}")
+            else:
+                raise ValueError("Programmer Error! Invalid choice!")
 
     def end_turn(self, game):
         if self._cards_acquired == 0 and len(game.hogwarts_deck._market) >= 0:
@@ -564,7 +585,9 @@ class Hero(object):
         self._only_one_damage = False
         self._extra_villain_rewards = []
         self._extra_card_effects = []
+        self._extra_damage_effects = []
         self.draw(game, 5, True)
+        self._proficiency.end_turn(game)
 
 
 def base_ally_effect(game):
@@ -577,13 +600,11 @@ def base_ally_effect(game):
         game.log(f"{hero.name} can't heal, gaining 1↯")
         hero.add_damage(game, 1)
         return
-    match game.input("Choose effect: (d)↯, (h)💜: ", "dh"):
-        case "d":
-            hero.add_damage(game, 1)
-        case "h":
-            hero.add_health(game, 2)
-        case _:
-            raise ValueError("Programmer Error! Invalid choice!")
+    choice = game.input("Choose effect: (d)↯, (h)💜: ", "dh")
+    if choice == "d":
+        hero.add_damage(game, 1)
+    elif choice == "h":
+        hero.add_health(game, 2)
 
 def beedle_effect(game):
     if len(game.heroes) == 1:
@@ -592,13 +613,10 @@ def beedle_effect(game):
     else:
         choice = game.input("Choose effect: (y)ou get 2💰, (a)ll get 1💰: ", "ya")
 
-    match choice:
-        case "y":
-            game.heroes.active_hero.add_influence(game, 2)
-        case "a":
-            game.heroes.all_heroes.add_influence(game, 1)
-        case _:
-            raise ValueError("Programmer Error! Invalid choice!")
+    if choice == "y":
+        game.heroes.active_hero.add_influence(game, 2)
+    elif choice == "a":
+        game.heroes.all_heroes.add_influence(game, 1)
 
 def time_turner_effect(game):
     game.heroes.active_hero.add_influence(game)
@@ -640,13 +658,11 @@ def mandrake_effect(game):
         break
 
 def bat_bogey_effect(game):
-    match game.input("Choose effect: (d)↯, (h) ALL heroes get 1💜: ", "dh"):
-        case "d":
-            game.heroes.active_hero.add_damage(game)
-        case "h":
-            game.heroes.all_heroes.add_health(game, 1)
-        case _:
-            raise ValueError("Programmer Error! Invalid choice!")
+    choice =  game.input("Choose effect: (d)↯, (h) ALL heroes get 1💜: ", "dh")
+    if choice == "d":
+        game.heroes.active_hero.add_damage(game)
+    elif choice == "h":
+        game.heroes.all_heroes.add_health(game, 1)
 
 def spectrespecs_effect(game):
     game.heroes.active_hero.add_influence(game)
@@ -670,7 +686,7 @@ def lion_hat_effect(game):
 
 
 class Hermione(Hero):
-    def __init__(self, game_num):
+    def __init__(self, game_num, proficiency):
         super().__init__("Hermione", game_num, [
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
@@ -682,7 +698,7 @@ class Hermione(Hero):
             hogwarts.Ally("Crookshanks", "Gain 1↯ or 2💜", 0, base_ally_effect),
             hogwarts.Item("Time-Turner", "Gain 1💰, may put acquired Spells on top of deck", 0, time_turner_effect),
             hogwarts.Item("The Tales of Beedle the Bard", "Gain 2💰, or ALL heroes gain 1💰", 0, beedle_effect),
-        ])
+        ], proficiency)
         self._spells_played = 0
         self._used_ability = False
 
@@ -725,7 +741,7 @@ class Hermione(Hero):
 
 
 class Ron(Hero):
-    def __init__(self, game_num):
+    def __init__(self, game_num, proficiency):
         super().__init__("Ron", game_num, [
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
@@ -737,7 +753,7 @@ class Ron(Hero):
             hogwarts.Ally("Pigwidgeon", "Gain 1↯ or 2💜", 0, base_ally_effect),
             hogwarts.Item("Every-flavour Beans", "Gain 1💰; for each Ally played, gain 1↯", 0, beans_effect),
             hogwarts.Item("Cleansweep 11", "Gain 1↯; if you defeat a Villain, gain 1💰", 0, broom_effect),
-        ])
+        ], proficiency)
         self._damage_assigned = 0
         self._used_ability = False
 
@@ -781,7 +797,7 @@ class Ron(Hero):
 
 
 class Harry(Hero):
-    def __init__(self, game_num):
+    def __init__(self, game_num, proficiency):
         super().__init__("Harry", game_num, [
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
@@ -793,7 +809,7 @@ class Harry(Hero):
             hogwarts.Ally("Hedwig", "Gain 1↯ or 2💜", 0, base_ally_effect),
             hogwarts.Item("Invisibility cloak", "Gain 1💰; if in hand, take only 1↯ from each Villain or Dark Arts", 0, lambda game: game.heroes.active_hero.add_influence(game)),
             hogwarts.Item("Firebolt", "Gain 1↯; if you defeat a Villain, gain 1💰", 0, broom_effect),
-        ])
+        ], proficiency)
         self._used_ability = False
 
     @property
@@ -832,7 +848,7 @@ class Harry(Hero):
 
 
 class Neville(Hero):
-    def __init__(self, game_num):
+    def __init__(self, game_num, proficiency):
         super().__init__("Neville", game_num, [
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
@@ -844,7 +860,7 @@ class Neville(Hero):
             hogwarts.Ally("Trevor", "Gain 1↯ or 2💜", 0, base_ally_effect),
             hogwarts.Item("Remembrall", "Gain 1💰; if discarded, gain 2💰", 0, lambda game: game.heroes.active_hero.add_influence(game), discard_effect=lambda game, hero: hero.add_influence(game, 2)),
             hogwarts.Item("Mandrake", "Gain 1↯, or one hero gains 2💜", 0, mandrake_effect),
-        ])
+        ], proficiency)
         self._healed_heroes = set()
 
     @property
@@ -884,11 +900,11 @@ class Neville(Hero):
             return
         self._healed_heroes.add(hero)
         game.log(f"First time {self.name} healed {hero.name} this turn, {hero.name} gets an extra 💜 or 💰")
-        match game.input("Choose effect: (h)💜, (i)💰: ", "hi"):
-            case "h":
-                hero.add_health(game, 1)
-            case "i":
-                hero.add_influence(game, 1)
+        choice = game.input("Choose effect: (h)💜, (i)💰: ", "hi")
+        if choice == "h":
+            hero.add_health(game, 1)
+        elif choice == "i":
+            hero.add_influence(game, 1)
 
     def play_turn(self, game):
         self._healed_heroes = set()
@@ -898,7 +914,7 @@ class Neville(Hero):
 
 
 class Ginny(Hero):
-    def __init__(self, game_num):
+    def __init__(self, game_num, proficiency):
         super().__init__("Ginny", game_num, [
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
@@ -910,7 +926,7 @@ class Ginny(Hero):
             hogwarts.Ally("Arnold", "Gain 1↯ or 2💜", 0, base_ally_effect),
             hogwarts.Item("Nimbus 2000", "Gain 1↯; if you defeat a Villian, gain 1💰", 0, broom_effect),
             hogwarts.Spell("Bat Bogey Hex", "Gain 1↯, or ALL heroes gain 1💜", 0, bat_bogey_effect),
-        ])
+        ], proficiency)
         self._villains_damaged = set()
         self._used_ability = False
 
@@ -938,7 +954,7 @@ class Ginny(Hero):
 
 
 class Luna(Hero):
-    def __init__(self, game_num):
+    def __init__(self, game_num, proficiency):
         super().__init__("Luna", game_num, [
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
             hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
@@ -950,7 +966,7 @@ class Luna(Hero):
             hogwarts.Ally("Crumple-horned Snorkack", "Gain 1↯ or 2💜", 0, base_ally_effect),
             hogwarts.Item("Spectrespecs", "Gain 1💰; you may reveal the top Dark Arts and choose to discard it", 0, spectrespecs_effect),
             hogwarts.Item("Lion Hat", "Gain 1💰; if another hero has broom or quidditch gear, gain 1↯", 0, lion_hat_effect),
-        ])
+        ], proficiency)
         self._used_ability = False
 
     @property

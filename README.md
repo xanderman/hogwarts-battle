@@ -6,10 +6,11 @@ Playing this game requires at least minimal familiarity with the terminal.
 You'll need to know at least how to run a python script (and download the code
 from github).
 
-Requires Python 3.10 or newer. Also requires your terminal be at least 50 lines
-high if you play with 1 or 2 heroes, and 70 lines for 3 or 4 heroes. Terminal
-width is more lenient, but you'll have a hard time reading anything if the
-screen is less than about 50 columns wide.
+I've tested this on Python 3.9.6. It should work on Python 2, but caveat
+emptor. It also requires your terminal be at least 50 lines high if you play
+with 1 or 2 heroes, and 70 lines for 3 or 4 heroes. Terminal width is more
+lenient, but you'll have a hard time reading anything if the screen is less
+than about 50 columns wide.
 
 To play, run `game.py` specifying which game number and heroes you want to play.
 
@@ -17,11 +18,11 @@ To play, run `game.py` specifying which game number and heroes you want to play.
 $ python game.py N HERO [HERO ...]
 ```
 
-Currently supported values of N are 1-5 (I'm working on games 6 and 7).
-Currently supported values of HERO are Hermione, Ron, Harry, Neville, Ginny,
-Luna. The game will run with only one hero, but the rules really aren't
-designed for that, so YMMV. Currently only supports up to 4 heroes -- there's
-just no room on the screen for a 5th.
+Currently supported values of N are 1-6 (I'm working on game 7). Currently
+supported values of HERO are Hermione, Ron, Harry, Neville, Ginny, Luna. The
+game will run with only one hero, but the rules really aren't designed for
+that, so YMMV. Currently only supports up to 4 heroes -- there's just no room
+on the screen for more.
 
 ## Gameplay
 I will not explain the rules of the game here. If you've never played the game
@@ -75,3 +76,17 @@ rules from all 7 games. Most notably, their hero ability is scaled to be
 somewhere between the game 3 and game 7 hero abilities. I've not adjusted the
 scaling, though I have made it so they get no abilities before game 3, like the
 OG heroes.
+
+There are times where the rules are slightly ambiguous, like if discarding
+cards from being stunned triggers the Defense Against the Dark Arts proficiency
+ability. In most cases I've chosen to interpret them as favorably to the player
+as I can. Where possible, I've made ordering unimportant: if a card gets a
+benefit from playing another card, the benefit applies whichever card is played
+first. There are, however, situations where this is impractical. Mostly that's
+around playing cards that give you benefits that are prevented by a villain you
+later defeat. Sometimes you'll want to play cards and assign damage carefully
+to maximize your benefits. There are other scenarios where you might gain and
+lose health, which ought to cancel out, but if you started at full health and
+the gain comes first, you'll gain nothing and then lose health. These
+situations are somewhat rare, and even more rarely make or break your victory,
+but they do come up.
