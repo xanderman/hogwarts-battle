@@ -1,3 +1,5 @@
+from collections import namedtuple
+
 import curses
 import random
 
@@ -5,6 +7,9 @@ import hogwarts
 
 class QuitGame(Exception):
     pass
+
+
+Action = namedtuple("Action", ["key", "description", "action"])
 
 
 class Heroes(object):
@@ -214,6 +219,7 @@ class Hero(object):
         self._health_callbacks = []
         self._drawing_allowed = True
         self._healing_allowed = True
+        self._gaining_out_of_turn_allowed = True
         self._basilisk_present = False
         self._greyback_present = False
         self._can_put_allies_in_deck = False
@@ -223,15 +229,18 @@ class Hero(object):
         self._extra_villain_rewards = []
         self._extra_card_effects = []
         self._extra_damage_effects = []
+        self._encounters = []
+        self._extra_actions = {}
         self._proficiency.start_game(self)
 
     def display_state(self, window, i, attr):
         window.clear()
-        window.addstr(f"{i}: {self.name} ({self._health}/{self._max_health}💜) -- Deck: {len(self._deck)}, Discard: {len(self._discard)}\n", attr)
+        window.addstr(f"{i}: {self.name} ({self._health}💜 {self._damage_tokens}ϟ {self._influence_tokens}💰) -- Deck: {len(self._deck)}, Discard: {len(self._discard)}\n", attr)
         if self.ability_description is not None:
             window.addstr(f"{self.ability_description}\n")
         self._proficiency.display_state(window)
-        window.addstr(f"  {self._damage_tokens}↯, {self._influence_tokens}💰\n")
+        for encounter in self._encounters:
+            window.addstr(f"{encounter}\n")
         window.addstr(f"  Hand ({len(self._hand)} cards):\n")
         for i, card in enumerate(self._hand):
             window.addstr(f"    {i}: ", curses.A_BOLD)
@@ -257,7 +266,7 @@ class Hero(object):
         game.log(f"{self.name} recovers from stun!")
         self._health = self._max_health
 
-    def add_health(self, game, amount=1):
+    def add_health(self, game, amount=1, source=None):
         if amount == 0:
             return
         if self.is_stunned(game):
@@ -291,7 +300,7 @@ class Hero(object):
         if health_start != self._health:
             health_gained = self._health - health_start
             for callback in self._health_callbacks:
-                callback.health_callback(game, self, health_gained)
+                callback.health_callback(game, self, health_gained, source)
 
     def remove_health(self, game, amount=1):
         self.add_health(game, -amount)
@@ -315,6 +324,17 @@ class Hero(object):
     @property
     def healing_allowed(self):
         return self._healing_allowed and not self._greyback_present and not self.is_stunned(None) and not self._health == self._max_health
+
+    def disallow_gaining_tokens_out_of_turn(self, game):
+        self._gaining_out_of_turn_allowed = False
+
+    def allow_gaining_tokens_out_of_turn(self, game):
+        self._gaining_out_of_turn_allowed = True
+
+    def gaining_tokens_allowed(self, game):
+        if self == game.heroes.active_hero:
+            return True
+        return self._gaining_out_of_turn_allowed
 
     def draw(self, game, count=1, end_of_turn=False):
         if not end_of_turn and not self.drawing_allowed:
@@ -465,6 +485,9 @@ class Hero(object):
             self.play_card(game, int(choice))
 
     def add_damage(self, game, amount=1):
+        if amount > 0 and game.heroes.active_hero != self and not self.gaining_tokens_allowed(game):
+            game.log(f"{self.name}: gaining ↯ on other heroes' turns not allowed!")
+            return
         self._damage_tokens += amount
         if self._damage_tokens < 0:
             self._damage_tokens = 0
@@ -483,7 +506,7 @@ class Hero(object):
         choice = game.input("Choose villain to assign ↯ to ('c' to cancel): ", choices)
         if choice == 'c':
             return None
-        if choice == 'v' and not game.villain_deck.voldemort_vulnerable():
+        if choice == 'v' and not game.villain_deck.voldemort_vulnerable(game):
             game.log("Voldemort is not vulnerable!")
             return None
         villain = game.villain_deck[choice]
@@ -496,11 +519,14 @@ class Hero(object):
                 reward(game)
             # Extra rewards only apply once
             self._extra_villain_rewards = []
-        for callback in self._extra_damage_effects:
-            callback(game)
+        for effect in self._extra_damage_effects:
+            effect(game, villain, 1)
         return villain
 
     def add_influence(self, game, amount=1):
+        if amount > 0 and game.heroes.active_hero != self and not self.gaining_tokens_allowed(game):
+            game.log(f"{self.name}: gaining 💰 on other heroes' turns not allowed!")
+            return
         self._influence_tokens += amount
         if self._influence_tokens < 0:
             self._influence_tokens = 0
@@ -521,42 +547,46 @@ class Hero(object):
     def add_extra_villain_reward(self, game, reward):
         self._extra_villain_rewards.append(reward)
 
+    def add_encounter(self, game, encounter):
+        self._encounters.append(encounter)
+
+    def add_action(self, game, key, description, action):
+        self._extra_actions[key] = (description, action)
+
     def play_turn(self, game):
         game.log(f"-----{self.name}'s turn-----")
         self._proficiency.start_turn(game)
+        for encounter in self._encounters:
+            encounter.reward_effect(game)
+        if game.locations.current.action is not None:
+            self.add_action(game, *game.locations.current.action)
         while True:
             game.display_state()
             actions = ["p", "a", "b", "e", "q"]
-            prompt = "Select (p)lay card, (a)ssign ↯, (b)uy card, (e)nd turn, or (q)uit: "
-            if self._proficiency.turn_action is not None:
-                p_action = self._proficiency.turn_action
-                actions.append(p_action[0])
-                prompt = f"Select (p)lay card, (a)ssign ↯, (b)uy card, {p_action[1]}, (e)nd turn, or (q)uit: "
+            prompt = "Select (p)lay card, (a)ssign ↯, (b)uy card"
+            for key, (description, _) in self._extra_actions.items():
+                actions.append(key)
+                prompt += f", {description}"
+            prompt += ", (e)nd turn, or (q)uit: "
 
             action = game.input(prompt, actions)
             if action == "p":
                 self.choose_and_play(game)
-            elif action == "a":
+                continue
+            if action == "a":
                 self.assign_damage(game)
-            elif action == "b":
+                continue
+            if action == "b":
                 self.buy_card(game)
-            elif action == "e":
+                continue
+            if action == "e":
                 return
-            elif action == "q":
+            if action == "q":
                 raise QuitGame()
-            elif action == p_action[0]:
-                p_action[2](game)
-            elif action == "debug":
-                # TODO reimplement
-                self.display_state()
-                game.log("Discard:")
-                for card in self._discard:
-                    game.log(f"\t{card}")
-                game.log("Deck:")
-                for card in self._deck:
-                    game.log(f"\t{card}")
-            else:
-                raise ValueError("Programmer Error! Invalid choice!")
+            if action in self._extra_actions:
+                self._extra_actions[action][1](game)
+                continue
+            raise ValueError("Programmer Error! Invalid choice!")
 
     def end_turn(self, game):
         if self._cards_acquired == 0 and len(game.hogwarts_deck._market) >= 0:
@@ -586,6 +616,7 @@ class Hero(object):
         self._extra_villain_rewards = []
         self._extra_card_effects = []
         self._extra_damage_effects = []
+        self._extra_actions = {}
         self.draw(game, 5, True)
         self._proficiency.end_turn(game)
 
@@ -871,7 +902,9 @@ class Neville(Hero):
             return "The first time a hero gains 💜 on your turn, that hero gains +1💜"
         return "Each time a hero gains 💜 on your turn, that hero gains +1💜"
 
-    def health_callback(self, game, hero, amount):
+    def health_callback(self, game, hero, amount, source):
+        if source == self:
+            return
         if self._game_num >= 7:
             self._game_seven_ability_healing_callback(game, hero, amount)
             return
@@ -885,13 +918,13 @@ class Neville(Hero):
             return
         self._healed_heroes.add(hero)
         game.log(f"First time {self.name} healed {hero.name} this turn, {hero.name} gets an extra 💜")
-        hero.add_health(game, 1)
+        hero.add_health(game, 1, source=self)
 
     def _game_seven_ability_healing_callback(self, game, hero, amount):
         if amount < 1:
             return
         game.log(f"{self.name} healed {hero.name}, {hero.name} gets an extra 💜")
-        hero.add_health(game, 1)
+        hero.add_health(game, 1, source=self)
 
     def _monster_box_one_ability_healing_callback(self, game, hero, amount):
         if hero in self._healed_heroes:

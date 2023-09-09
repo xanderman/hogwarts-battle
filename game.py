@@ -6,21 +6,29 @@ import argparse
 import curses
 import random
 
-import locations
 import dark_arts
-import villains
-import hogwarts
+import encounters
 import heroes
+import hogwarts
+import locations
 import proficiencies
+import villains
 
 class Game(object):
     def __init__(self, window, game_num, chosen_heroes):
         self._window = window
         self._window.noutrefresh()
-        locations_window = window.subwin(7, curses.COLS // 2, 0, 0)
-        self.locations = locations.Locations(locations_window, game_num)
+        if game_num < 7:
+            locations_window = window.subwin(7, curses.COLS // 2, 0, 0)
+            dark_arts_window = window.subwin(7, curses.COLS // 2, 0, curses.COLS // 2)
+            self.encounters = None
+        else:
+            locations_window = window.subwin(7, curses.COLS // 3, 0, 0)
+            enounters_window = window.subwin(7, curses.COLS // 3, 0, curses.COLS // 3)
+            dark_arts_window = window.subwin(7, curses.COLS // 3, 0, curses.COLS * 2 // 3)
+            self.encounters = encounters.EncountersDeck(enounters_window, game_num)
 
-        dark_arts_window = window.subwin(7, curses.COLS // 2, 0, curses.COLS // 2)
+        self.locations = locations.Locations(locations_window, game_num)
         self.dark_arts_deck = dark_arts.DarkArtsDeck(dark_arts_window, game_num)
 
         villains_window = window.subwin(15, curses.COLS // 2, 7, 0)
@@ -67,11 +75,20 @@ class Game(object):
             self._init_log_window()
             self._refresh_log()
 
-            self.dark_arts_deck._window.mvwin(0, curses.COLS // 2)
             self.hogwarts_deck._window.mvwin(7, curses.COLS // 2)
-        self.locations.display_state(resize=resize, size=(7, curses.COLS // 2))
-        self.dark_arts_deck.display_state(resize=resize, size=(7, curses.COLS // 2))
-        self.villain_deck.display_state(resize=resize, size=(15, curses.COLS // 2))
+            if self.encounters is None:
+                self.dark_arts_deck._window.mvwin(0, curses.COLS // 2)
+            else:
+                self.encounters._window.mvwin(0, curses.COLS // 3)
+                self.dark_arts_deck._window.mvwin(0, curses.COLS * 2 // 3)
+        if self.encounters is None:
+            self.locations.display_state(resize=resize, size=(7, curses.COLS // 2))
+            self.dark_arts_deck.display_state(resize=resize, size=(7, curses.COLS // 2))
+        else:
+            self.locations.display_state(resize=resize, size=(7, curses.COLS // 3))
+            self.encounters.display_state(resize=resize, size=(7, curses.COLS // 3))
+            self.dark_arts_deck.display_state(resize=resize, size=(7, curses.COLS // 3))
+        self.villain_deck.display_state(self, resize=resize, size=(15, curses.COLS // 2))
         self.hogwarts_deck.display_state(resize=resize, size=(15, curses.COLS // 2))
         self.heroes.display_state(resize=resize, size=(self._heroes_height, curses.COLS))
         curses.doupdate()
@@ -132,12 +149,16 @@ class Game(object):
 
         self.log("-----Turn start-----")
         self.dark_arts_deck.play_turn(self)
+        if self.encounters is not None:
+            self.encounters.play_turn(self)
         self.villain_deck.play_turn(self)
         self.heroes.play_turn(self)
 
         self.log("-----Cleanup phase-----")
         self.heroes.all_heroes.recover_from_stun(self)
         self.dark_arts_deck.end_turn()
+        if self.encounters is not None:
+            self.encounters.check_completion(self)
         self.villain_deck.reveal(self)
         self.heroes.active_hero.end_turn(self)
         self.hogwarts_deck.refill_market(self)
@@ -167,8 +188,11 @@ class Game(object):
 
     def _roll_die(self, options):
         die_result = random.choice(options)
-        if self.heroes.active_hero._proficiency.can_reroll_house_dice and game.input(f"Rolled {die_result}, (a)ccept or (r)eroll?", "ar") == "r":
+        if self.heroes.active_hero._proficiency.can_reroll_house_dice and self.input(f"Rolled {die_result}, (a)ccept or (r)eroll?", "ar") == "r":
             die_result = random.choice(options)
+        if self.encounters.current.die_roll_applies(self, die_result) and self.input(f"Rolled {die_result}, apply to encounter? (y/n): ", "yn") == "y":
+            self.encounters.current.apply_die_roll(self, die_result)
+            return
         if die_result == "↯":
             self.log("Rolled ↯, ALL heroes gain 1↯")
             self.heroes.all_heroes.add_damage(self, 1)

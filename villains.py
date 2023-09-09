@@ -24,7 +24,7 @@ class VillainDeck(object):
 
     def _init_window(self):
         self._window.box()
-        self._window.addstr(0, 1, "Dark Arts Deck")
+        self._window.addstr(0, 1, "Villains")
         self._window.noutrefresh()
         beg = self._window.getbegyx()
         self._pad_start_line = beg[0] + 1
@@ -33,7 +33,7 @@ class VillainDeck(object):
         self._pad_end_line = self._pad_start_line + end[0] - 3
         self._pad_end_col = self._pad_start_col + end[1] - 3
 
-    def display_state(self, resize=False, size=None):
+    def display_state(self, game, resize=False, size=None):
         if resize:
             self._window.resize(*size)
             self._window.clear()
@@ -50,12 +50,12 @@ class VillainDeck(object):
         for i, villain in enumerate(self.current):
             villain.display_state(self._pad, i)
         if self.voldemort_active():
-            self._display_voldemort()
+            self._display_voldemort(game)
         self._pad.noutrefresh(0,0, self._pad_start_line,self._pad_start_col, self._pad_end_line,self._pad_end_col)
 
-    def _display_voldemort(self):
+    def _display_voldemort(self, game):
         self._pad.addstr("Voldemort:")
-        if self.voldemort_vulnerable():
+        if self.voldemort_vulnerable(game):
             self._pad.addstr(" *vulnerable*\n", curses.A_BOLD | curses.color_pair(1))
         else:
             self._pad.addstr(" *invulnerable*\n", curses.A_BOLD | curses.color_pair(2))
@@ -68,6 +68,7 @@ class VillainDeck(object):
     def reveal(self, game):
         for villain in self.all_villains:
             villain.took_damage = False
+        voldemort_was_active = self.voldemort_active()
         while len(self.current) < self._max and len(self._deck) > 0:
             death_eaters = sum(1 for v in game.villain_deck.current if v.name == "Death Eater")
             villain = self._deck.pop()
@@ -76,12 +77,18 @@ class VillainDeck(object):
             if death_eaters > 0:
                 game.log(f"Death Eater (x{death_eaters}): Villain revealed, ALL heroes lose {death_eaters}💜")
                 game.heroes.all_heroes.remove_health(game, death_eaters)
+        if self.voldemort_active() and not voldemort_was_active:
+            game.log("Voldemort revealed!")
+            self._voldemort.on_reveal(game)
+            if death_eaters > 0:
+                game.log(f"Death Eater (x{death_eaters}): Villain revealed, ALL heroes lose {death_eaters}💜")
+                game.heroes.all_heroes.remove_health(game, death_eaters)
 
     def voldemort_active(self):
         return self._voldemort is not None and len(self._deck) == 0
 
-    def voldemort_vulnerable(self):
-        return self.voldemort_active() and len(self.current) == 0
+    def voldemort_vulnerable(self, game):
+        return self.voldemort_active() and len(self.current) == 0 and (game.encounters is None or game.encounters.all_copmlete)
 
     @property
     def choices(self):
@@ -422,6 +429,12 @@ def bellatrix_per_hero(game, hero):
     if len(items) == 0:
         game.log(f"{hero.name} has no items in discard")
         return
+    if len(items) == 1:
+        item = items[0]
+        game.log(f"{hero.name} has only one item in discard, taking {item}")
+        hero._discard.remove(item)
+        hero._hand.append(item)
+        return
     game.log(f"Items in {hero.name}'s discard:")
     for i, item in enumerate(items):
         game.log(f" {i}: {item}")
@@ -472,12 +485,14 @@ class GameSixVoldemort(Villain):
 game_seven_villains = [
 ]
 
-def GameSevenVoldemort(Villain):
+class GameSevenVoldemort(Villain):
     def __init__(self):
         super().__init__("Lord Voldemort", "Add 1💀; each time 💀 is removed, ALL heroes lose 1💜",
                          "You win!", 20, effect=lambda game: game.locations.add_control(game),
                          on_reveal=lambda game: game.locations.add_control_callback(game, self),
-                         reward=lambda game: game.locations.remove_control_callback(game, self))
+                         reward=lambda game: game.locations.remove_control_callback(game, self),
+                         on_stun=lambda game: game.locations.remove_control_callback(game, self),
+                         on_recover_from_stun=lambda game: game.locations.add_control_callback(game, self))
 
     def control_callback(self, game, amount):
         if amount > -1:

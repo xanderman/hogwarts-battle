@@ -560,7 +560,7 @@ class Confundus(Spell):
         self._used_ability = False
         game.heroes.active_hero.add_extra_damage_effect(game, self.__extra_effect)
 
-    def __extra_effect(self, game):
+    def __extra_effect(self, game, villain, damage):
         if all([villain.took_damage for villain in game.villain_deck.all_villains]) and not self._used_ability:
             game.log(f"Damaged all villains, {self.name} removes 1💀")
             game.locations.remove_control(game)
@@ -617,7 +617,20 @@ def elder_wand_effect(game):
     game.heroes.active_hero.add_extra_card_effect(game, add_if_spell)
 
 def slughorn_effect(game):
-    game.heroes.all_heroes.add(game, influence=1, hearts=1)
+    for hero in game.heroes.all_heroes:
+        if not hero.healing_allowed:
+            game.log(f"Horace Slughorn: {hero.name} can't heal, gaining 1💰")
+            hero.add_influence(game, 1)
+            continue
+        if not hero.gaining_tokens_allowed(game):
+            game.log(f"Horace Slughorn: {hero.name} not allowed to gain tokens, gaining 1💜")
+            hero.add_health(game, 1)
+            continue
+        choice = game.input(f"Horace Slughorn: {hero.name} gains (i) 1💰 or (h) 1💜: ", "ih")
+        if choice == 'i':
+            hero.add_influence(game, 1)
+        elif choice == 'h':
+            hero.add_health(game, 1)
     game.roll_slytherin_die()
 
 game_six_cards = [

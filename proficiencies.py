@@ -16,10 +16,6 @@ class Proficiency(object):
     def display_state(self, window):
         window.addstr(f"{self}\n")
 
-    @property
-    def turn_action(self):
-        return None
-
     def cost_modifier(self, game, card):
         return 0
 
@@ -49,9 +45,8 @@ class FlyingLessons(Proficiency):
     def __init__(self):
         super().__init__("Flying Lessons", "1/turn: pay 5💰 to remove 1💀")
 
-    @property
-    def turn_action(self):
-        return ('f', "(f)lying Lessons", self._use_ability)
+    def start_turn(self, game):
+        game.heroes.active_hero.add_action(game, 'f', "(f)lying lessons", self._use_ability)
 
     def _use_ability(self, game):
         if self._used_ability:
@@ -73,9 +68,8 @@ class Charms(Proficiency):
     def __init__(self):
         super().__init__("Charms", "1/turn: discard 2 spells; ALL heroes gain 1💰 and draw a card")
 
-    @property
-    def turn_action(self):
-        return ('c', "(c)harms", self._use_ability)
+    def start_turn(self, game):
+        game.heroes.active_hero.add_action(game, 'c', "(c)harms", self._use_ability)
 
     def _use_ability(self, game):
         if self._used_ability:
@@ -125,9 +119,8 @@ class Transfiguration(Proficiency):
     def __init__(self):
         super().__init__("Transfiguration", "1/turn: discard an item to take card with cost 5💰 or less from deck")
 
-    @property
-    def turn_action(self):
-        return ('t', "(t)ransfiguration", self._use_ability)
+    def start_turn(self, game):
+        game.heroes.active_hero.add_action(game, 't', "(t)ransfiguration", self._use_ability)
 
     def _use_ability(self, game):
         if self._used_ability:
@@ -181,7 +174,7 @@ class Herbology(Proficiency):
     def end_turn(self, game):
         game.heroes.remove_health_callback(game, self)
 
-    def health_callback(self, game, hero, amount):
+    def health_callback(self, game, hero, amount, source):
         if amount < 1:
             return
         self._healing[hero] += amount

@@ -71,12 +71,13 @@ class Locations(object):
 
 
 class Location(object):
-    def __init__(self, name, dark_arts_count, control_max, desc="", reveal_effect=lambda game: None):
+    def __init__(self, name, dark_arts_count, control_max, desc="", reveal_effect=lambda game: None, action=None):
         self.name = name
         self.dark_arts_count = dark_arts_count
         self._control_max = control_max
         self.desc = desc
         self._reveal_effect = reveal_effect
+        self.action = action
 
         self._control = 0
 
@@ -183,13 +184,20 @@ game_six_locations = [
 ]
 
 def castle_effect(game):
-    pass
+    game.heroes.all_heroes.remove_health(game, 2)
+
+def castle_action(game):
+    if game.heroes.active_hero._damage_tokens < 5:
+        game.log("Not enough ↯ to use Hogwarts Castle")
+        return
+    game.heroes.active_hero.remove_damage(game, 5)
+    game.locations.remove_control(game)
 
 game_seven_locations = [
     Location("Godric's Hollow", 1, 6),
     Location("Gringotts", 2, 6),
     Location("Room of Requirement", 2, 7),
-    Location("Hogwarts Castle", 3, 8, "ALL heroes lose 2💜, may spend 5↯ to remove 1💀", castle_effect),
+    Location("Hogwarts Castle", 3, 8, "ALL heroes lose 2💜, may spend 5↯ to remove 1💀", castle_effect, ('H', "(H)ogwarts Castle", castle_action)),
 ]
 
 LOCATIONS = [
