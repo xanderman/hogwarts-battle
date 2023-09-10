@@ -170,12 +170,12 @@ class Herbology(Proficiency):
     def start_turn(self, game):
         self._healing = Counter()
         self._used_ability = set()
-        game.heroes.add_health_callback(game, self)
+        game.heroes.add_hearts_callback(game, self)
 
     def end_turn(self, game):
-        game.heroes.remove_health_callback(game, self)
+        game.heroes.remove_hearts_callback(game, self)
 
-    def health_callback(self, game, hero, amount, source):
+    def hearts_callback(self, game, hero, amount, source):
         if amount < 1:
             return
         self._healing[hero] += amount

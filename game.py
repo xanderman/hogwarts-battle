@@ -200,7 +200,9 @@ class Game(object):
         die_result = random.choice(options)
         if self.heroes.active_hero._proficiency.can_reroll_house_dice and self.input(f"Rolled {die_result}, (a)ccept or (r)eroll?", "ar") == "r":
             die_result = random.choice(options)
-        if self.encounters.current.die_roll_applies(self, die_result) and self.input(f"Rolled {die_result}, apply to encounter? (y/n): ", "yn") == "y":
+        if (self.encounters is not None
+            and self.encounters.current.die_roll_applies(self, die_result)
+            and self.input(f"Rolled {die_result}, apply to encounter? (y/n): ", "yn") == "y"):
             self.encounters.current.apply_die_roll(self, die_result)
             return
         if die_result == constants.DAMAGE:
@@ -211,7 +213,7 @@ class Game(object):
             self.heroes.all_heroes.add_influence(self, 1)
         elif die_result == constants.HEART:
             self.log(f"Rolled {constants.HEART}, ALL heroes gain 1{constants.HEART}")
-            self.heroes.all_heroes.add_health(self, 1)
+            self.heroes.all_heroes.add_hearts(self, 1)
         elif die_result == constants.CARD:
             self.log(f"Rolled {constants.CARD}, ALL heroes draw a card")
             self.heroes.all_heroes.draw(self)

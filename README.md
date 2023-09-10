@@ -52,7 +52,7 @@ aren't one of the listed options (or navigation keys) are ignored. If you pick
 an option that breaks the rules, the log will tell you and either ask for
 another input or send you back to the main turn "menu". HOWEVER! the game will
 typically not stop you from making stupid choices. It's entirely possible to
-waste healing on heroes that are already at full health or stunned, for
+waste healing on heroes that are already at full hearts or stunned, for
 instance. There's no undo (seriously, that's super hard to implement) so take
 care. Sometimes an action triggers an effect that needs input, and it's
 surprisingly easy for that to interrupt the "flow" of a turn and trip you up.
@@ -102,7 +102,7 @@ played first. There are, however, situations where this is impractical. Mostly
 that's around playing cards that give you benefits that are prevented by a
 villain you later defeat. Sometimes you'll want to play cards and assign damage
 carefully to maximize your benefits. There are other scenarios where you might
-gain and lose health, which ought to cancel out, but if you started at full
-health and the gain comes first, you'll gain nothing and then lose health.
+gain and lose hearts, which ought to cancel out, but if you started at full
+hearts and the gain comes first, you'll gain nothing and then lose hearts.
 These situations are somewhat rare, and even more rarely make or break your
 victory, but they do come up.

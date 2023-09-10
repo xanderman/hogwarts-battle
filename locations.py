@@ -186,7 +186,7 @@ game_six_locations = [
 ]
 
 def castle_effect(game):
-    game.heroes.all_heroes.remove_health(game, 2)
+    game.heroes.all_heroes.remove_hearts(game, 2)
 
 def castle_action(game):
     if game.heroes.active_hero._damage_tokens < 5:

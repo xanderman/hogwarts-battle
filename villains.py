@@ -79,13 +79,13 @@ class VillainDeck(object):
             villain.on_reveal(game)
             if death_eaters > 0:
                 game.log(f"Death Eater (x{death_eaters}): Villain revealed, ALL heroes lose {death_eaters}{constants.HEART}")
-                game.heroes.all_heroes.remove_health(game, death_eaters)
+                game.heroes.all_heroes.remove_hearts(game, death_eaters)
         if self.voldemort_active() and not voldemort_was_active:
             game.log("Voldemort revealed!")
             self._voldemort.on_reveal(game)
             if death_eaters > 0:
                 game.log(f"Death Eater (x{death_eaters}): Villain revealed, ALL heroes lose {death_eaters}{constants.HEART}")
-                game.heroes.all_heroes.remove_health(game, death_eaters)
+                game.heroes.all_heroes.remove_hearts(game, death_eaters)
 
     def voldemort_active(self):
         return self._voldemort is not None and len(self._deck) == 0
@@ -132,12 +132,12 @@ class VillainList(list):
 
 
 class Villain(object):
-    def __init__(self, name, description, reward_desc, health, effect=lambda game: None, on_reveal=lambda game: None,
+    def __init__(self, name, description, reward_desc, hearts, effect=lambda game: None, on_reveal=lambda game: None,
                  reward=lambda game: None, on_stun=lambda game: None, on_recover_from_stun=lambda game:None):
         self.name = name
         self.description = description
         self.reward_desc = reward_desc
-        self._health = health
+        self._hearts = hearts
         self.effect = effect
         self.on_reveal = on_reveal
         self._reward = reward
@@ -150,7 +150,7 @@ class Villain(object):
         self._stunned_by = None
 
     def display_state(self, window, i):
-        window.addstr(f"{i}: {self.name} ({self._damage}{constants.DAMAGE}/{self._health}{constants.HEART})")
+        window.addstr(f"{i}: {self.name} ({self._damage}{constants.DAMAGE}/{self._hearts}{constants.HEART})")
         if self._stunned:
             window.addstr(" *stunned*", curses.A_BOLD | curses.color_pair(1))
         window.addstr(f"\n     {self.description}")
@@ -158,7 +158,7 @@ class Villain(object):
 
     def play_turn(self, game):
         if self._stunned:
-            game.log(f"Villain: {self.name} ({self._damage}/{self._health}) is stunned!")
+            game.log(f"Villain: {self.name} ({self._damage}/{self._hearts}) is stunned!")
             if game.heroes.active_hero == self._stunned_by:
                 game.log(f"{self.name} was stunned by {self._stunned_by.name}, so recovers")
                 self._stunned = False
@@ -169,12 +169,12 @@ class Villain(object):
         self.effect(game)
 
     def __str__(self):
-        return f"{self.name} ({self._damage}/{self._health}), {self.description}"
+        return f"{self.name} ({self._damage}/{self._hearts}), {self.description}"
 
     def add_damage(self, game, amount=1):
         self.took_damage = True
         self._damage += amount
-        if self._damage >= self._health:
+        if self._damage >= self._hearts:
             self.reward(game)
             if self == game.villain_deck._voldemort:
                 game.villain_deck._voldemort = None
@@ -213,7 +213,7 @@ class Draco(Villain):
             return
         game.log(f"{self.name}: {amount}{constants.CONTROL} added, {game.heroes.active_hero.name} loses 2{constants.HEART} for each")
         for _ in range(amount):
-            game.heroes.active_hero.remove_health(game, 2)
+            game.heroes.active_hero.remove_hearts(game, 2)
 
     def __reward(self, game):
         game.locations.remove_control_callback(game, self)
@@ -232,7 +232,7 @@ class Crabbe(Villain):
             game.log(f"{self.name} is stunned! No penalty for discard")
             return
         game.log(f"{self.name}: {hero.name} discarded, so loses 1{constants.HEART}")
-        hero.remove_health(game, 1)
+        hero.remove_hearts(game, 1)
 
     def __reward(self, game):
         game.heroes.remove_discard_callback(game, self)
@@ -244,7 +244,7 @@ game_one_villains = [
     Crabbe(),
     Villain("Quirinus Quirrell", f"Active hero loses 1{constants.HEART}",
             f"ALL heroes gain 1{constants.HEART} and 1{constants.INFLUENCE}", 6,
-            effect=lambda game: game.heroes.active_hero.remove_health(game),
+            effect=lambda game: game.heroes.active_hero.remove_hearts(game),
             reward=lambda game: game.heroes.all_heroes.add(game, influence=1, hearts=1)),
 ]
 
@@ -286,7 +286,7 @@ def riddle_effect(game):
         choices = ['h'] + [str(i) for i in range(len(hero._hand))]
         choice = game.input(f"Choose a card for {hero.name} to discard or (h) to lose 2{constants.HEART}: ", choices)
         if choice == 'h':
-            hero.remove_health(game, 2)
+            hero.remove_hearts(game, 2)
         else:
             choice = int(choice)
             hero.discard(game, choice)
@@ -295,7 +295,7 @@ def riddle_reward(game, hero):
     allies = [card for card in hero._discard if card.is_ally()]
     if len(allies) == 0:
         game.log(f"{hero.name} has no allies in discard, gaining 2{constants.HEART}")
-        hero.add_health(game, 2)
+        hero.add_hearts(game, 2)
         return
     game.log(f"Allies in {hero.name}'s discard:")
     for i, ally in enumerate(allies):
@@ -303,7 +303,7 @@ def riddle_reward(game, hero):
     choices = ['h'] + [str(i) for i in range(len(allies))]
     choice = game.input(f"Choose an ally for {hero.name} to take or (h) to gain 2{constants.HEART}: ", choices)
     if choice == 'h':
-        hero.add_health(game, 2)
+        hero.add_hearts(game, 2)
         return
     ally = allies[int(choice)]
     hero._discard.remove(ally)
@@ -323,7 +323,7 @@ game_two_villains = [
 ]
 
 def dementor_reward(game):
-    game.heroes.all_heroes.add_health(game, 2)
+    game.heroes.all_heroes.add_hearts(game, 2)
     game.locations.remove_control(game)
 
 def pettigrew_effect(game):
@@ -365,7 +365,7 @@ game_three_villains = [
     # TODO also creature
     Villain("Dementor", f"Active hero loses 2{constants.HEART}",
             f"ALL heroes gain 2{constants.HEART}; remove 1{constants.CONTROL}", 8,
-            effect=lambda game: game.heroes.active_hero.remove_health(game, 2),
+            effect=lambda game: game.heroes.active_hero.remove_hearts(game, 2),
             reward=dementor_reward),
     Villain("Peter Pettigrew", f"Reveal top card of deck, if costs 1{constants.INFLUENCE} or more, discard and add 1{constants.CONTROL}",
             f"ALL heroes may take Spell from discard; remove 1{constants.CONTROL}", 7,
@@ -373,7 +373,7 @@ game_three_villains = [
 ]
 
 def death_eater_reward(game):
-    game.heroes.all_heroes.add_health(game, 1)
+    game.heroes.all_heroes.add_hearts(game, 1)
     game.locations.remove_control(game)
 
 def crouch_reward(game):
@@ -404,7 +404,7 @@ class Umbridge(Villain):
                 game.log(f"{self.name} is stunned! No penalty for acquire")
                 return
             game.log(f"{self.name}: {game.heroes.active_hero.name} acquired {card.name}, so loses 1{constants.HEART}")
-            hero.remove_health(game, 1)
+            hero.remove_hearts(game, 1)
 
     def __reward(self, game):
         game.heroes.remove_acquire_callback(game, self)
@@ -448,7 +448,7 @@ def bellatrix_per_hero(game, hero):
 
 def greyback_reward(game):
     game.heroes.greyback_defeated(game)
-    game.heroes.all_heroes.add_health(game, 3)
+    game.heroes.all_heroes.add_hearts(game, 3)
     game.locations.remove_control(game, 2)
 
 game_six_villains = [
@@ -474,7 +474,7 @@ class GameSixVoldemort(Villain):
             die_result = random.choice(faces)
         if die_result == constants.DAMAGE:
             game.log(f"Rolled {constants.DAMAGE}, ALL heroes lose 1{constants.HEART}")
-            game.heroes.all_heroes.remove_health(game, 1)
+            game.heroes.all_heroes.remove_hearts(game, 1)
         elif die_result == constants.INFLUENCE:
             game.log(f"Rolled {constants.INFLUENCE}, adding 1{constants.CONTROL} to the location")
             game.locations.add_control(game)
@@ -505,7 +505,7 @@ class GameSevenVoldemort(Villain):
             return
         game.log(f"{self.name}: {constants.CONTROL} removed, ALL heroes lose 1{constants.HEART} for each")
         for _ in range(-amount):
-            game.heroes.all_heroes.remove_health(game, 1)
+            game.heroes.all_heroes.remove_hearts(game, 1)
 
 VILLAINS = [
     game_one_villains,

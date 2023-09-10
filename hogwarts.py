@@ -143,7 +143,7 @@ class Spell(HogwartsCard):
 
 def hagrid_effect(game):
     game.heroes.active_hero.add_damage(game)
-    game.heroes.all_heroes.add_health(game)
+    game.heroes.all_heroes.add_hearts(game)
 
 def sorting_hat_effect(game):
     game.heroes.active_hero.add_influence(game, 2)
@@ -175,12 +175,12 @@ def dittany_effect(game):
         if not hero.healing_allowed:
             game.log(f"{hero.name} cannot heal, choose another hero!")
             continue
-        hero.add_health(game, 2)
+        hero.add_hearts(game, 2)
         break
 
 def oliver_effect(game):
     game.heroes.active_hero.add_damage(game)
-    game.heroes.active_hero.add_extra_villain_reward(game, lambda game: game.heroes.choose_hero(game, prompt=f"Oliver Wood: Villain defeated! Choose hero to gain 2{constants.HEART}: ").add_health(game, 2))
+    game.heroes.active_hero.add_extra_villain_reward(game, lambda game: game.heroes.choose_hero(game, prompt=f"Oliver Wood: Villain defeated! Choose hero to gain 2{constants.HEART}: ").add_hearts(game, 2))
 
 game_one_cards = [
     Spell("Wingardium Leviosa", f"Gain 1{constants.INFLUENCE}, may put acquired Items on top of deck", 2, wingardium_effect),
@@ -247,7 +247,7 @@ def fawkes_effect(game):
     if choice == "d":
         game.heroes.active_hero.add_damage(game, 2)
     elif choice == "h":
-        game.heroes.all_heroes.add_health(game, 2)
+        game.heroes.all_heroes.add_hearts(game, 2)
 
 def dobby_effect(game):
     game.locations.remove_control(game)
@@ -302,7 +302,7 @@ def crystal_ball_effect(game):
 
 def lupin_effect(game):
     game.heroes.active_hero.add_damage(game)
-    game.heroes.choose_hero(game, prompt=f"Choose hero to gain 3{constants.HEART}: ").add_health(game, 3)
+    game.heroes.choose_hero(game, prompt=f"Choose hero to gain 3{constants.HEART}: ").add_hearts(game, 3)
 
 def trelawny_effect(game):
     hero = game.heroes.active_hero
@@ -368,7 +368,7 @@ def snape_effect(game):
     game.heroes.active_hero.add(game, damage=1, hearts=2)
     game.roll_slytherin_die()
 
-def add_health_if_ally_once(card, game):
+def add_hearts_if_ally_once(card, game):
     if card.is_ally():
         game.log("Ally {card.name} played, beans add damage")
         game.heroes.active_hero.add_damage(game)
@@ -384,14 +384,14 @@ class FleurDelacour(Ally):
         for card in game.heroes.active_hero._play_area:
             if card.is_ally() and card != self:
                 game.log(f"Ally {card.name} already played, {self.name} adds 2{constants.HEART}")
-                game.heroes.active_hero.add_health(game, 2)
+                game.heroes.active_hero.add_hearts(game, 2)
                 return
         game.heroes.active_hero.add_extra_card_effect(game, self.__extra_effect)
 
     def __extra_effect(self, game, card):
         if card.is_ally() and card != self and not self._used_ability:
             game.log(f"Ally {card.name} played, {self.name} adds 2{constants.HEART}")
-            game.heroes.active_hero.add_health(game, 2)
+            game.heroes.active_hero.add_hearts(game, 2)
             self._used_ability = True
 
 def flitwick_effect(game):
@@ -419,7 +419,7 @@ def sprout_effect(game):
     if not game.heroes.healing_allowed:
         game.log("Healing not allowed, skipping healing effect")
     else:
-        game.heroes.choose_hero(game, prompt=f"Choose hero to gain 2{constants.HEART}: ").add_health(game, 2)
+        game.heroes.choose_hero(game, prompt=f"Choose hero to gain 2{constants.HEART}: ").add_hearts(game, 2)
     game.roll_hufflepuff_die()
 
 game_four_cards = [
@@ -500,7 +500,7 @@ def weasley_twin_effect(bonus):
                     if bonus == constants.INFLUENCE:
                         game.heroes.all_heroes.add_influence(game, 1)
                     elif bonus == constants.HEART:
-                        game.heroes.all_heroes.add_health(game, 1)
+                        game.heroes.all_heroes.add_hearts(game, 1)
                     return
     return effect
 
@@ -575,14 +575,14 @@ def bezoar_effect(game):
     if not game.heroes.healing_allowed:
         game.log("Healing not allowed!")
     else:
-        game.heroes.choose_hero(game, prompt=f"Choose hero to gain 3{constants.HEART}: ").add_health(game, 3)
+        game.heroes.choose_hero(game, prompt=f"Choose hero to gain 3{constants.HEART}: ").add_hearts(game, 3)
     game.heroes.active_hero.draw(game)
 
 def advanced_potion_effect(game):
-    game.heroes.all_heroes.add_health(game, 2)
+    game.heroes.all_heroes.add_hearts(game, 2)
     for hero in game.heroes:
-        if hero._health == hero._max_health:
-            game.log(f"{hero.name} at max health, gaining 1{constants.DAMAGE} and drawing a card")
+        if hero._hearts == hero._max_hearts:
+            game.log(f"{hero.name} at max hearts, gaining 1{constants.DAMAGE} and drawing a card")
             hero.add(game, damage=1, cards=1)
 
 class FelixFelicis(Item):
@@ -595,7 +595,7 @@ class FelixFelicis(Item):
     def __effect(self, game):
         choices = {'d': f"2{constants.DAMAGE}", 'i': f"2{constants.INFLUENCE}", 'h': f"2{constants.HEART}", 'c': "draw 2 cards"}
         if not game.heroes.active_hero.healing_allowed:
-            game.log("Healing not allowed, removing health option")
+            game.log("Healing not allowed, removing hearts option")
             del(choices['h'])
         if not game.heroes.active_hero.drawing_allowed:
             game.log("Drawing not allowed, removing draw option")
@@ -614,7 +614,7 @@ class FelixFelicis(Item):
             elif choice == 'i':
                 game.heroes.active_hero.add_influence(game, 2)
             elif choice == 'h':
-                game.heroes.active_hero.add_health(game, 2)
+                game.heroes.active_hero.add_hearts(game, 2)
             elif choice == 'c':
                 game.heroes.active_hero.draw(game, 2)
 
@@ -638,13 +638,13 @@ def slughorn_effect(game):
             continue
         if not hero.gaining_tokens_allowed(game):
             game.log(f"{hero.name} not allowed to gain tokens, gaining 1{constants.HEART}")
-            hero.add_health(game, 1)
+            hero.add_hearts(game, 1)
             continue
         choice = game.input(f"Choose {hero.name} gains (i) 1{constants.INFLUENCE} or (h) 1{constants.HEART}: ", "ih")
         if choice == 'i':
             hero.add_influence(game, 1)
         elif choice == 'h':
-            hero.add_health(game, 1)
+            hero.add_hearts(game, 1)
     game.roll_slytherin_die()
 
 game_six_cards = [

@@ -82,15 +82,15 @@ class DarkArtsCard(object):
 
 
 def petrification_effect(game, hero):
-    hero.remove_health(game)
+    hero.remove_hearts(game)
     hero.disallow_drawing(game)
 
 game_one_cards = [
     DarkArtsCard("Petrification", f"ALL heroes lose 1{constants.HEART}; no drawing cards", lambda game: game.heroes.all_heroes.effect(game, petrification_effect)),
     DarkArtsCard("Petrification", f"ALL heroes lose 1{constants.HEART}; no drawing cards", lambda game: game.heroes.all_heroes.effect(game, petrification_effect)),
-    DarkArtsCard("Expulso", f"Active hero loses 2{constants.HEART}", lambda game: game.heroes.active_hero.remove_health(game, 2)),
-    DarkArtsCard("Expulso", f"Active hero loses 2{constants.HEART}", lambda game: game.heroes.active_hero.remove_health(game, 2)),
-    DarkArtsCard("Expulso", f"Active hero loses 2{constants.HEART}", lambda game: game.heroes.active_hero.remove_health(game, 2)),
+    DarkArtsCard("Expulso", f"Active hero loses 2{constants.HEART}", lambda game: game.heroes.active_hero.remove_hearts(game, 2)),
+    DarkArtsCard("Expulso", f"Active hero loses 2{constants.HEART}", lambda game: game.heroes.active_hero.remove_hearts(game, 2)),
+    DarkArtsCard("Expulso", f"Active hero loses 2{constants.HEART}", lambda game: game.heroes.active_hero.remove_hearts(game, 2)),
     DarkArtsCard("He Who Must Not Be Named", f"Add 1{constants.CONTROL} to the location", lambda game: game.locations.add_control(game)),
     DarkArtsCard("He Who Must Not Be Named", f"Add 1{constants.CONTROL} to the location", lambda game: game.locations.add_control(game)),
     DarkArtsCard("He Who Must Not Be Named", f"Add 1{constants.CONTROL} to the location", lambda game: game.locations.add_control(game)),
@@ -99,20 +99,20 @@ game_one_cards = [
 ]
 
 def hand_of_glory_effect(game):
-    game.heroes.active_hero.remove_health(game, 1)
+    game.heroes.active_hero.remove_hearts(game, 1)
     game.locations.add_control(game)
 
 def relashio_effect(game, hero):
     items = sum(1 for card in hero._hand if card.is_item())
     if items == 0:
         game.log(f"{hero.name} has no items to discard, losing 2{constants.HEART}")
-        hero.remove_health(game, 2)
+        hero.remove_hearts(game, 2)
         return
     while True:
         choices = ['h'] + [str(i) for i in range(len(hero._hand))]
         choice = game.input(f"Choose an item for {hero.name} to discard or (h) to lose 2{constants.HEART}: ", choices)
         if choice == 'h':
-            hero.remove_health(game, 2)
+            hero.remove_hearts(game, 2)
             break
         choice = int(choice)
         card = hero._hand[choice]
@@ -126,13 +126,13 @@ def poison_effect(game, hero):
     allies = sum(1 for card in hero._hand if card.is_ally())
     if allies == 0:
         game.log(f"{hero.name} has no allies to discard, losing 2{constants.HEART}")
-        hero.remove_health(game, 2)
+        hero.remove_hearts(game, 2)
         return
     while True:
         choices = ['h'] + [str(i) for i in range(len(hero._hand))]
         choice = game.input(f"Choose an ally for {hero.name} to discard or (h) to lose 2{constants.HEART}: ", choices)
         if choice == 'h':
-            hero.remove_health(game, 2)
+            hero.remove_hearts(game, 2)
             break
         choice = int(choice)
         card = hero._hand[choice]
@@ -146,13 +146,13 @@ def obliviate_effect(game, hero):
     spells = sum(1 for card in hero._hand if card.is_spell())
     if spells == 0:
         game.log(f"{hero.name} has no spells to discard, losing 2{constants.HEART}")
-        hero.remove_health(game, 2)
+        hero.remove_hearts(game, 2)
         return
     while True:
         choices = ['h'] + [str(i) for i in range(len(hero._hand))]
         choice = game.input(f"Choose a spell for {hero.name} to discard or (h) to lose 2{constants.HEART}: ", choices)
         if choice == 'h':
-            hero.remove_health(game, 2)
+            hero.remove_hearts(game, 2)
             break
         choice = int(choice)
         card = hero._hand[choice]
@@ -171,8 +171,8 @@ game_two_cards = [
 ]
 
 def kiss_effect(game):
-    game.heroes.active_hero.remove_health(game, 2)
-    game.heroes.all_heroes_except_active.remove_health(game, 1)
+    game.heroes.active_hero.remove_hearts(game, 2)
+    game.heroes.all_heroes_except_active.remove_hearts(game, 1)
 
 def opugno_effect(game, hero):
     card = hero.reveal_top_card(game)
@@ -182,11 +182,11 @@ def opugno_effect(game, hero):
     game.log(f"{hero.name} revealed {card}")
     if card.cost >= 1:
         hero.discard_top_card(game)
-        hero.remove_health(game, 2)
+        hero.remove_hearts(game, 2)
 
 def tarantallegra_effect(game):
     hero = game.heroes.active_hero
-    hero.remove_health(game, 1)
+    hero.remove_hearts(game, 1)
     hero.allow_only_one_damage(game)
 
 game_three_cards = [
@@ -200,17 +200,17 @@ def morsmordre_effect(game):
     death_eaters = sum(1 for v in game.villain_deck.current if v.name == "Death Eater")
     if death_eaters > 0:
         game.log(f"Damage increased to {death_eaters+1}{constants.HEART} by Death Eater(s)")
-    game.heroes.all_heroes.remove_health(game, 1 + death_eaters)
+    game.heroes.all_heroes.remove_hearts(game, 1 + death_eaters)
     game.locations.add_control(game)
 
 def imperio_effect(game):
     game.heroes.choose_hero(game, prompt=f"Choose hero to lose 2{constants.HEART}: ", disallow=game.heroes.active_hero,
-                            disallow_msg="Active hero cannot be chosen!").remove_health(game, 2)
+                            disallow_msg="Active hero cannot be chosen!").remove_hearts(game, 2)
     game.dark_arts_deck.play(game, 1)
 
 def avada_kedavra_effect(game):
     was_stunned = game.heroes.active_hero.is_stunned(game)
-    game.heroes.active_hero.remove_health(game, 3)
+    game.heroes.active_hero.remove_hearts(game, 3)
     if not was_stunned and game.heroes.active_hero.is_stunned(game):
         game.log(f"Stunned by Avada Kedavra! Adding another {constants.CONTROL}")
         game.locations.add_control(game)
@@ -223,7 +223,7 @@ def heir_of_slytherin_effect(game):
         die_result = random.choice(faces)
     if die_result == constants.DAMAGE:
         game.log(f"Rolled {constants.DAMAGE}, ALL heroes lose 1{constants.HEART}")
-        game.heroes.all_heroes.remove_health(game, 1)
+        game.heroes.all_heroes.remove_hearts(game, 1)
     elif die_result == constants.INFLUENCE:
         game.log(f"Rolled {constants.INFLUENCE}, adding 1{constants.CONTROL} to the location")
         game.locations.add_control(game)
@@ -235,7 +235,7 @@ def heir_of_slytherin_effect(game):
         game.heroes.all_heroes.choose_and_discard(game)
 
 def crucio_effect(game):
-    game.heroes.active_hero.remove_health(game)
+    game.heroes.active_hero.remove_hearts(game)
     game.dark_arts_deck.play(game, 1)
 
 game_four_cards = [
@@ -251,7 +251,7 @@ game_four_cards = [
 
 def decree_effect(game):
     total = sum(1 for card in game.heroes.active_hero._hand if card.cost >= 4)
-    game.heroes.active_hero.remove_health(game, total)
+    game.heroes.active_hero.remove_hearts(game, total)
 
 def legilimency_effect(game, hero):
     card = hero.reveal_top_card(game)
@@ -261,7 +261,7 @@ def legilimency_effect(game, hero):
     game.log(f"{hero.name} revealed {card}")
     if card.is_spell():
         hero.discard_top_card(game)
-        hero.remove_health(game, 2)
+        hero.remove_hearts(game, 2)
 
 game_five_cards = [
     DarkArtsCard("Educational Decree", f"Active hero loses 1{constants.HEART} for each card with cost 4{constants.INFLUENCE} or more in hand", decree_effect),
@@ -274,7 +274,7 @@ game_five_cards = [
 ]
 
 def sectumsempra_effect(game, hero):
-    hero.remove_health(game, 2)
+    hero.remove_hearts(game, 2)
     hero.disallow_healing(game)
 
 game_six_cards = [
@@ -284,7 +284,7 @@ game_six_cards = [
 ]
 
 game_seven_cards = [
-    DarkArtsCard("Fiendfyre", f"ALL heroes lose 3{constants.HEART}", lambda game: game.heroes.all_heroes.remove_health(game, 3)),
+    DarkArtsCard("Fiendfyre", f"ALL heroes lose 3{constants.HEART}", lambda game: game.heroes.all_heroes.remove_hearts(game, 3)),
     DarkArtsCard("Imperio", f"Choose another hero to lose 2{constants.HEART}; reveal another card", imperio_effect),
     DarkArtsCard("Avada Kedavra", f"Active hero loses 3{constants.HEART}, if stun add +1{constants.CONTROL}; reveal another card", avada_kedavra_effect),
     DarkArtsCard("Crucio", f"Active hero loses 1{constants.HEART}; reveal another card", crucio_effect),

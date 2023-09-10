@@ -188,13 +188,13 @@ class Heroes(object):
         for hero in self._heroes:
             hero.remove_discard_callback(game, callback)
 
-    def add_health_callback(self, game, callback):
+    def add_hearts_callback(self, game, callback):
         for hero in self._heroes:
-            hero.add_health_callback(game, callback)
+            hero.add_hearts_callback(game, callback)
 
-    def remove_health_callback(self, game, callback):
+    def remove_hearts_callback(self, game, callback):
         for hero in self._heroes:
-            hero.remove_health_callback(game, callback)
+            hero.remove_hearts_callback(game, callback)
 
 
 class HeroList(list):
@@ -216,8 +216,8 @@ class Hero(object):
     def __init__(self, name, game_num, starting_deck, proficiency):
         self.name = name
         self._game_num = game_num
-        self._max_health = 10
-        self._health = 10
+        self._max_hearts = 10
+        self._hearts = 10
         self._deck = []
         self._hand = []
         self._play_area = []
@@ -228,7 +228,7 @@ class Hero(object):
         self._cards_acquired = 0
         self._acquire_callbacks = []
         self._discard_callbacks = []
-        self._health_callbacks = []
+        self._hearts_callbacks = []
         self._drawing_allowed = True
         self._healing_allowed = True
         self._gaining_out_of_turn_allowed = True
@@ -247,7 +247,7 @@ class Hero(object):
 
     def display_state(self, mode, window, i, attr):
         window.clear()
-        window.addstr(f"{i}: {self.name} ({self._health}{constants.HEART} {self._damage_tokens}{constants.DAMAGE} {self._influence_tokens}{constants.INFLUENCE}) -- Deck: {len(self._deck)}, Discard: {len(self._discard)}\n", attr)
+        window.addstr(f"{i}: {self.name} ({self._hearts}{constants.HEART} {self._damage_tokens}{constants.DAMAGE} {self._influence_tokens}{constants.INFLUENCE}) -- Deck: {len(self._deck)}, Discard: {len(self._discard)}\n", attr)
         if mode == DisplayMode.DEFAULT:
             if self.ability_description is not None:
                 window.addstr(f"{self.ability_description}\n")
@@ -278,22 +278,22 @@ class Hero(object):
         return None
 
     def is_stunned(self, game):
-        return self._health == 0
+        return self._hearts == 0
 
     def recover_from_stun(self, game):
         if not self.is_stunned(game):
             return
         game.log(f"{self.name} recovers from stun!")
-        self._health = self._max_health
+        self._hearts = self._max_hearts
 
-    def add_health(self, game, amount=1, source=None):
+    def add_hearts(self, game, amount=1, source=None):
         if amount == 0:
             return
         if self.is_stunned(game):
-            game.log(f"{self.name} is stunned and cannot gain/lose health!")
+            game.log(f"{self.name} is stunned and cannot gain/lose hearts!")
             return
-        if amount > 0 and self._health == self._max_health:
-            game.log(f"{self.name} is already at max health!")
+        if amount > 0 and self._hearts == self._max_hearts:
+            game.log(f"{self.name} is already at max hearts!")
             return
         if amount > 0 and not self.healing_allowed:
             game.log(f"{self.name}: healing not allowed!")
@@ -302,28 +302,28 @@ class Hero(object):
             game.log(f"Invisibility cloak prevents {-1 - amount}{constants.DAMAGE}!")
             amount = -1
         if amount < 0:
-            game.log(f"{self.name} loses {-amount} health!")
+            game.log(f"{self.name} loses {-amount} hearts!")
         else:
-            game.log(f"{self.name} gains {amount} health!")
-        health_start = self._health
-        self._health += amount
-        if self._health > self._max_health:
-            self._health = self._max_health
-        if self._health < 0:
-            self._health = 0
+            game.log(f"{self.name} gains {amount} hearts!")
+        hearts_start = self._hearts
+        self._hearts += amount
+        if self._hearts > self._max_hearts:
+            self._hearts = self._max_hearts
+        if self._hearts < 0:
+            self._hearts = 0
         if self.is_stunned(game):
             game.log(f"{self.name} has been stunned!")
             game.locations.add_control(game)
             self._damage_tokens = 0
             self._influence_tokens = 0
             self.choose_and_discard(game, len(self._hand) // 2)
-        if health_start != self._health:
-            health_gained = self._health - health_start
-            for callback in self._health_callbacks:
-                callback.health_callback(game, self, health_gained, source)
+        if hearts_start != self._hearts:
+            hearts_gained = self._hearts - hearts_start
+            for callback in self._hearts_callbacks:
+                callback.hearts_callback(game, self, hearts_gained, source)
 
-    def remove_health(self, game, amount=1):
-        self.add_health(game, -amount)
+    def remove_hearts(self, game, amount=1):
+        self.add_hearts(game, -amount)
 
     def disallow_drawing(self, game):
         self._drawing_allowed = False
@@ -343,7 +343,7 @@ class Hero(object):
 
     @property
     def healing_allowed(self):
-        return self._healing_allowed and not self._greyback_present and not self.is_stunned(None) and not self._health == self._max_health
+        return self._healing_allowed and not self._greyback_present and not self.is_stunned(None) and not self._hearts == self._max_hearts
 
     def disallow_gaining_tokens_out_of_turn(self, game):
         self._gaining_out_of_turn_allowed = False
@@ -422,11 +422,11 @@ class Hero(object):
     def remove_discard_callback(self, game, callback):
         self._discard_callbacks.remove(callback)
 
-    def add_health_callback(self, game, callback):
-        self._health_callbacks.append(callback)
+    def add_hearts_callback(self, game, callback):
+        self._hearts_callbacks.append(callback)
 
-    def remove_health_callback(self, game, callback):
-        self._health_callbacks.remove(callback)
+    def remove_hearts_callback(self, game, callback):
+        self._hearts_callbacks.remove(callback)
 
     def can_put_allies_in_deck(self, game):
         self._can_put_allies_in_deck = True
@@ -561,8 +561,8 @@ class Hero(object):
             self.draw(game, cards)
         elif cards < 0:
             self.choose_and_discard(game, -cards)
-        # health last so that if we're stunned, it applies last
-        self.add_health(game, hearts)
+        # hearts last so that if we're stunned, it applies last
+        self.add_hearts(game, hearts)
 
     def add_extra_villain_reward(self, game, reward):
         self._extra_villain_rewards.append(reward)
@@ -643,8 +643,8 @@ class Hero(object):
 
 def base_ally_effect(game):
     hero = game.heroes.active_hero
-    if hero._health == hero._max_health:
-        game.log(f"{hero.name} is already at max health, gaining 1{constants.DAMAGE}")
+    if hero._hearts == hero._max_hearts:
+        game.log(f"{hero.name} is already at max hearts, gaining 1{constants.DAMAGE}")
         hero.add_damage(game, 1)
         return
     if not hero.healing_allowed:
@@ -655,7 +655,7 @@ def base_ally_effect(game):
     if choice == "d":
         hero.add_damage(game, 1)
     elif choice == "h":
-        hero.add_health(game, 2)
+        hero.add_hearts(game, 2)
 
 def beedle_effect(game):
     if len(game.heroes) == 1:
@@ -705,7 +705,7 @@ def mandrake_effect(game):
         if not hero.healing_allowed:
             game.log(f"{hero.name} can't heal, choose another hero!")
             continue
-        game.heroes[int(choice)].add_health(game, 2)
+        game.heroes[int(choice)].add_hearts(game, 2)
         break
 
 def bat_bogey_effect(game):
@@ -717,7 +717,7 @@ def bat_bogey_effect(game):
     if choice == "d":
         game.heroes.active_hero.add_damage(game)
     elif choice == "h":
-        game.heroes.all_heroes.add_health(game, 1)
+        game.heroes.all_heroes.add_hearts(game, 1)
 
 def spectrespecs_effect(game):
     game.heroes.active_hero.add_influence(game)
@@ -840,15 +840,15 @@ class Ron(Hero):
         super().play_turn(game)
 
     def _game_three_ability(self, game):
-        game.heroes.choose_hero(game, prompt=f"{self.name} assigned 3 or more {constants.DAMAGE}, choose hero to gain 2{constants.HEART}: ").add_health(game, 2)
+        game.heroes.choose_hero(game, prompt=f"{self.name} assigned 3 or more {constants.DAMAGE}, choose hero to gain 2{constants.HEART}: ").add_hearts(game, 2)
 
     def _game_seven_ability(self, game):
         game.log(f"{self.name} assigned 3 or more {constants.DAMAGE}, all heroes gain 2{constants.HEART}")
-        game.heroes.all_heroes.add_health(game, 2)
+        game.heroes.all_heroes.add_hearts(game, 2)
 
     def _monster_box_one_ability(self, game):
         game.log(f"{self.name} assigned 3 or more {constants.DAMAGE}/{constants.INFLUENCE}, all heroes gain 1{constants.HEART}")
-        game.heroes.all_heroes.add_health(game, 1)
+        game.heroes.all_heroes.add_hearts(game, 1)
 
 
 class Harry(Hero):
@@ -899,7 +899,7 @@ class Harry(Hero):
     def _monster_box_one_ability_control_callback(self, game, amount):
         game.log(f"{self.name}: {constants.CONTROL} removed, ALL heroes gain 1{constants.HEART} for each")
         for _ in range(amount):
-            game.heroes.all_heroes.add_health(game, 1)
+            game.heroes.all_heroes.add_hearts(game, 1)
 
 
 class Neville(Hero):
@@ -926,7 +926,7 @@ class Neville(Hero):
             return f"The first time a hero gains {constants.HEART} on your turn, that hero gains +1{constants.HEART}"
         return f"Each time a hero gains {constants.HEART} on your turn, that hero gains +1{constants.HEART}"
 
-    def health_callback(self, game, hero, amount, source):
+    def hearts_callback(self, game, hero, amount, source):
         if source == self:
             return
         if self._game_num >= 7:
@@ -942,13 +942,13 @@ class Neville(Hero):
             return
         self._healed_heroes.add(hero)
         game.log(f"First time {self.name} healed {hero.name} this turn, {hero.name} gets an extra {constants.HEART}")
-        hero.add_health(game, 1, source=self)
+        hero.add_hearts(game, 1, source=self)
 
     def _game_seven_ability_healing_callback(self, game, hero, amount):
         if amount < 1:
             return
         game.log(f"{self.name} healed {hero.name}, {hero.name} gets an extra {constants.HEART}")
-        hero.add_health(game, 1, source=self)
+        hero.add_hearts(game, 1, source=self)
 
     def _monster_box_one_ability_healing_callback(self, game, hero, amount):
         if hero in self._healed_heroes:
@@ -962,20 +962,20 @@ class Neville(Hero):
             return
         if not hero.gaining_tokens_allowed(game):
             game.log(f"{hero.name} can't gain tokens, {hero.name} gains 1{constants.HEART}")
-            hero.add_health(game, 1)
+            hero.add_hearts(game, 1)
             return
         self._healed_heroes.add(hero)
         choice = game.input(f"Choose effect: (h){constants.HEART}, (i){constants.INFLUENCE}: ", "hi")
         if choice == "h":
-            hero.add_health(game, 1)
+            hero.add_hearts(game, 1)
         elif choice == "i":
             hero.add_influence(game, 1)
 
     def play_turn(self, game):
         self._healed_heroes = set()
-        game.heroes.add_health_callback(game, self)
+        game.heroes.add_hearts_callback(game, self)
         super().play_turn(game)
-        game.heroes.remove_health_callback(game, self)
+        game.heroes.remove_hearts_callback(game, self)
 
 
 class Ginny(Hero):
@@ -1044,7 +1044,7 @@ class Luna(Hero):
         cards_before = len(self._hand)
         super().draw(game, count, end_of_turn)
         if not end_of_turn and self._game_num >= 3 and len(self._hand) > cards_before and not self._used_ability:
-            game.heroes.choose_hero(game, prompt=f"{self.name} drew first extra card, choose hero to gain 2{constants.HEART}: ").add_health(game, 2)
+            game.heroes.choose_hero(game, prompt=f"{self.name} drew first extra card, choose hero to gain 2{constants.HEART}: ").add_hearts(game, 2)
             self._used_ability = True
 
     def play_turn(self, game):

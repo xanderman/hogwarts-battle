@@ -156,7 +156,7 @@ class Diary(Horcrux):
     def __extra_effect(self, game, card):
         if card.is_ally():
             game.log(f"{self.name}: Ally {card.name} played, {game.heroes.active_hero.name} loses 1{constants.HEART}")
-            game.heroes.active_hero.remove_health(game)
+            game.heroes.active_hero.remove_hearts(game)
 
     def reward_effect(self, game):
         self._allies_played = 0
@@ -173,7 +173,7 @@ class Diary(Horcrux):
             self._used_ability = True
             hero = game.heroes.active_hero
             game.heroes.choose_hero(
-                    game, prompt=f"{self.name}: {hero.name} played 2 allies, choose hero to gain 2{constants.HEART}: ").add_health(game, 2)
+                    game, prompt=f"{self.name}: {hero.name} played 2 allies, choose hero to gain 2{constants.HEART}: ").add_hearts(game, 2)
 
 class Ring(Horcrux):
     def __init__(self):
@@ -202,7 +202,7 @@ class Ring(Horcrux):
         if self._damaged_villains[villain] >= 2 and villain not in self._used_ability:
             self._used_ability.add(villain)
             game.log(f"{self.name}: {game.heroes.active_hero.name} assigned 2{constants.DAMAGE} to {villain.name}, loses 2{constants.HEART}")
-            game.heroes.active_hero.remove_health(game, 2)
+            game.heroes.active_hero.remove_hearts(game, 2)
 
     def reward_effect(self, game):
         self._used_ability = False
@@ -385,7 +385,7 @@ class Diadem(Horcrux):
         types_in_hand = set(type(card) for card in hero._hand)
         if types_in_hand.issuperset(set([hogwarts.Ally, hogwarts.Item, hogwarts.Spell])):
             game.log(f"{self.name}: {hero.name} has one ally, item, and spell; loses 2{constants.HEART}")
-            hero.remove_health(game, 2)
+            hero.remove_hearts(game, 2)
 
     def reward_effect(self, game):
         self._used_ability = False
@@ -446,7 +446,7 @@ class Nagini(Horcrux):
             self.completed = True
 
     def effect(self, game):
-        game.heroes.active_hero.remove_health(game)
+        game.heroes.active_hero.remove_hearts(game)
         game.heroes.active_hero.disallow_healing(game)
 
     def reward_effect(self, game):
