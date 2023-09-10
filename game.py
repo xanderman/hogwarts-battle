@@ -114,6 +114,10 @@ class Game(object):
                 if key == " ":
                     self.scroll_log_to_bottom()
                     continue
+                if key == "\t":
+                    self.heroes.next_display_mode()
+                    self.display_state()
+                    continue
                 if key in valid_choices:
                     break
             except curses.error:

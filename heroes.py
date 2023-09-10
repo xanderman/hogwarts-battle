@@ -1,4 +1,5 @@
 from collections import namedtuple
+from enum import StrEnum, auto
 
 import curses
 import random
@@ -10,6 +11,15 @@ class QuitGame(Exception):
     pass
 
 
+class DisplayMode(StrEnum):
+    DEFAULT = auto()
+    HAND = auto()
+    PLAY_AREA = auto()
+    DISCARD = auto()
+
+DISPLAY_MODES = [DisplayMode.DEFAULT, DisplayMode.HAND, DisplayMode.PLAY_AREA, DisplayMode.DISCARD]
+
+
 class Heroes(object):
     def __init__(self, window, game_num, chosen_heroes):
         self._window = window
@@ -18,6 +28,7 @@ class Heroes(object):
         self._harry = next((hero for hero in self._heroes if hero.name == "Harry"), None)
         self._current = 0
 
+        self._display_mode = 0
         self._init_window()
         self._pads = [curses.newpad(100,100) for _ in self._heroes]
 
@@ -35,6 +46,9 @@ class Heroes(object):
             self._window.hline(self._pad_lines//2, 1, curses.ACS_HLINE, self._pad_cols - 2)
         self._window.noutrefresh()
 
+    def next_display_mode(self):
+        self._display_mode = (self._display_mode + 1) % len(DISPLAY_MODES)
+
     def display_state(self, resize=False, size=None):
         if resize:
             self._window.resize(*size)
@@ -42,7 +56,7 @@ class Heroes(object):
             self._init_window()
         for i, hero in enumerate(self._heroes):
             attr = curses.A_BOLD | curses.color_pair(1) if i == self._current else curses.A_NORMAL
-            hero.display_state(self._pads[i], i, attr)
+            hero.display_state(DISPLAY_MODES[self._display_mode], self._pads[i], i, attr)
             first_line = self._pad_start_line + (i//2)*(self._pad_lines//2)
             first_col = self._pad_start_col + (i%2)*(self._pad_cols//2)
             last_line = first_line + self._pad_lines//self._hero_rows - 2
@@ -231,22 +245,30 @@ class Hero(object):
         self._extra_actions = {}
         self._proficiency.start_game(self)
 
-    def display_state(self, window, i, attr):
+    def display_state(self, mode, window, i, attr):
         window.clear()
         window.addstr(f"{i}: {self.name} ({self._health}{constants.HEART} {self._damage_tokens}{constants.DAMAGE} {self._influence_tokens}{constants.INFLUENCE}) -- Deck: {len(self._deck)}, Discard: {len(self._discard)}\n", attr)
-        if self.ability_description is not None:
-            window.addstr(f"{self.ability_description}\n")
-        self._proficiency.display_state(window)
-        for encounter in self._encounters:
-            window.addstr(f"{encounter}\n")
-        window.addstr(f"  Hand ({len(self._hand)} cards):\n")
-        for i, card in enumerate(self._hand):
-            window.addstr(f"    {i}: ", curses.A_BOLD)
-            card.display_name(window, curses.A_BOLD)
-            window.addstr(f"\n        {card.description}\n")
-        if len(self._play_area) != 0:
+        if mode == DisplayMode.DEFAULT:
+            if self.ability_description is not None:
+                window.addstr(f"{self.ability_description}\n")
+            self._proficiency.display_state(window)
+            for encounter in self._encounters:
+                window.addstr(f"{encounter}\n")
+        if mode == DisplayMode.DEFAULT or mode == DisplayMode.HAND:
+            window.addstr(f"  Hand ({len(self._hand)} cards):\n")
+            for i, card in enumerate(self._hand):
+                window.addstr(f"    {i}: ", curses.A_BOLD)
+                card.display_name(window, curses.A_BOLD)
+                window.addstr(f"\n        {card.description}\n")
+        if mode == DisplayMode.DEFAULT or mode == DisplayMode.PLAY_AREA:
             window.addstr(f"  Play area ({len(self._play_area)} cards):\n")
             for i, card in enumerate(self._play_area):
+                window.addstr(f"    {i}: ", curses.A_BOLD)
+                card.display_name(window, curses.A_BOLD)
+                window.addstr(f"\n        {card.description}\n")
+        if mode == DisplayMode.DISCARD:
+            window.addstr(f"  Discard ({len(self._discard)} cards):\n")
+            for i, card in enumerate(self._discard):
                 window.addstr(f"    {i}: ", curses.A_BOLD)
                 card.display_name(window, curses.A_BOLD)
                 window.addstr(f"\n        {card.description}\n")
