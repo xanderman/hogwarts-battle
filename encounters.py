@@ -2,6 +2,7 @@ from collections import Counter
 
 import curses
 
+import constants
 import hogwarts
 
 # In game 7 these are Horcurxes, but in the expansions the concept is generalized into Encounters.
@@ -134,19 +135,19 @@ class Horcrux(Encounter):
 
 class Diary(Horcrux):
     def __init__(self):
-        super().__init__("Diary", "Each time a hero plays an ally, lose 1💜", "If you play 2 allies, one hero gains 2💜")
+        super().__init__("Diary", f"Each time a hero plays an ally, lose 1{constants.HEART}", f"If you play 2 allies, one hero gains 2{constants.HEART}")
 
     def _display_to_complete(self, window):
-        window.addstr("roll 💜 or 🃏")
+        window.addstr(f"roll {constants.HEART} or {constants.CARD}")
         if self.completed:
             window.addstr(" ✔", curses.A_BOLD | curses.color_pair(1))
 
     def die_roll_applies(self, game, result):
-        return (result == "💜" or result == "🃏") and not self.completed
+        return (result == constants.HEART or result == f"{constants.CARD}") and not self.completed
 
     def apply_die_roll(self, game, result):
-        if not (result == "💜" or result == "🃏"):
-            raise ValueError("Programmer Error! Diary only applies to 💜 or 🃏")
+        if not (result == constants.HEART or result == constants.CARD):
+            raise ValueError(f"Programmer Error! Diary only applies to {constants.HEART} or {constants.CARD}")
         self.completed = True
 
     def effect(self, game):
@@ -154,7 +155,7 @@ class Diary(Horcrux):
 
     def __extra_effect(self, game, card):
         if card.is_ally():
-            game.log(f"{self.name}: Ally {card.name} played, {game.heroes.active_hero.name} loses 1💜")
+            game.log(f"{self.name}: Ally {card.name} played, {game.heroes.active_hero.name} loses 1{constants.HEART}")
             game.heroes.active_hero.remove_health(game)
 
     def reward_effect(self, game):
@@ -166,26 +167,29 @@ class Diary(Horcrux):
         if card.is_ally():
             self._allies_played += 1
         if self._allies_played >= 2 and not self._used_ability:
+            if not game.heroes.healing_allowed:
+                game.log("Healing not allowed, cannot use Diary")
+                return
             self._used_ability = True
             hero = game.heroes.active_hero
             game.heroes.choose_hero(
-                    game, prompt=f"{self.name}: {hero.name} played 2 allies, choose hero to gain 2💜: ").add_health(game, 2)
+                    game, prompt=f"{self.name}: {hero.name} played 2 allies, choose hero to gain 2{constants.HEART}: ").add_health(game, 2)
 
 class Ring(Horcrux):
     def __init__(self):
-        super().__init__("Ring", "If you assign 2↯ to a villain, lose 2💜", "1/turn: discard two cards to remove 1💀")
+        super().__init__("Ring", f"If you assign 2{constants.DAMAGE} to a villain, lose 2{constants.HEART}", f"1/turn: discard two cards to remove 1{constants.CONTROL}")
 
     def _display_to_complete(self, window):
-        window.addstr("roll ↯ or 💰")
+        window.addstr(f"roll {constants.DAMAGE} or {constants.INFLUENCE}")
         if self.completed:
             window.addstr(" ✔", curses.A_BOLD | curses.color_pair(1))
 
     def die_roll_applies(self, game, result):
-        return (result == "↯" or result == "💰") and not self.completed
+        return (result == constants.DAMAGE or result == constants.INFLUENCE) and not self.completed
 
     def apply_die_roll(self, game, result):
-        if not (result == "↯" or result == "💰"):
-            raise ValueError("Programmer Error! Ring only applies to ↯ or 💰")
+        if not (result == constants.DAMAGE or result == constants.INFLUENCE):
+            raise ValueError(f"Programmer Error! Ring only applies to {constants.DAMAGE} or {constants.INFLUENCE}")
         self.completed = True
 
     def effect(self, game):
@@ -197,7 +201,7 @@ class Ring(Horcrux):
         self._damaged_villains[villain] += damage
         if self._damaged_villains[villain] >= 2 and villain not in self._used_ability:
             self._used_ability.add(villain)
-            game.log(f"{self.name}: {game.heroes.active_hero.name} assigned 2↯ to {villain.name}, loses 2💜")
+            game.log(f"{self.name}: {game.heroes.active_hero.name} assigned 2{constants.DAMAGE} to {villain.name}, loses 2{constants.HEART}")
             game.heroes.active_hero.remove_health(game, 2)
 
     def reward_effect(self, game):
@@ -239,29 +243,29 @@ class Ring(Horcrux):
 
 class Locket(Horcrux):
     def __init__(self):
-        super().__init__("Locket", "Heroes cannot gain ↯ or 💰 on other heroes' turns", "1/turn: discard a card to roll the Slytherin die")
+        super().__init__("Locket", f"Heroes cannot gain {constants.DAMAGE} or {constants.INFLUENCE} on other heroes' turns", "1/turn: discard a card to roll the Slytherin die")
         self._got_damage = False
         self._got_heart = False
 
     def _display_to_complete(self, window):
-        window.addstr("roll ↯")
+        window.addstr(f"roll {constants.DAMAGE}")
         if self._got_damage:
             window.addstr("✔", curses.A_BOLD | curses.color_pair(1))
-        window.addstr(" and 💜")
+        window.addstr(f" and {constants.HEART}")
         if self._got_heart:
             window.addstr("✔", curses.A_BOLD | curses.color_pair(1))
 
     def die_roll_applies(self, game, result):
-        return ((result == "↯" and not self._got_damage) or
-                (result == "💜" and not self._got_heart)) and not self.completed
+        return ((result == constants.DAMAGE and not self._got_damage) or
+                (result == constants.HEART and not self._got_heart)) and not self.completed
 
     def apply_die_roll(self, game, result):
-        if result == "↯":
+        if result == constants.DAMAGE:
             self._got_damage = True
-        elif result == "💜":
+        elif result == constants.HEART:
             self._got_heart = True
         else:
-            raise ValueError("Programmer Error! Locket only applies to ↯ or 💜")
+            raise ValueError(f"Programmer Error! Locket only applies to {constants.DAMAGE} or {constants.HEART}")
         if self._got_damage and self._got_heart:
             self.completed = True
 
@@ -296,29 +300,29 @@ class Locket(Horcrux):
 
 class Cup(Horcrux):
     def __init__(self):
-        super().__init__("Cup", "Remove 1↯ from all villains", "1/turn: discard a card to roll the Hufflepuff die")
+        super().__init__("Cup", f"Remove 1{constants.DAMAGE} from all villains", "1/turn: discard a card to roll the Hufflepuff die")
         self._got_heart = False
         self._got_influence = False
 
     def _display_to_complete(self, window):
-        window.addstr("roll 💜")
+        window.addstr(f"roll {constants.HEART}")
         if self._got_heart:
             window.addstr("✔", curses.A_BOLD | curses.color_pair(1))
-        window.addstr(" and 💰")
+        window.addstr(f" and {constants.INFLUENCE}")
         if self._got_influence:
             window.addstr("✔", curses.A_BOLD | curses.color_pair(1))
 
     def die_roll_applies(self, game, result):
-        return ((result == "💜" and not self._got_heart) or
-                (result == "💰" and not self._got_influence)) and not self.completed
+        return ((result == constants.HEART and not self._got_heart) or
+                (result == constants.INFLUENCE and not self._got_influence)) and not self.completed
 
     def apply_die_roll(self, game, result):
-        if result == "💜":
+        if result == constants.HEART:
             self._got_heart = True
-        elif result == "💰":
+        elif result == constants.INFLUENCE:
             self._got_influence = True
         else:
-            raise ValueError("Programmer Error! Cup only applies to 💜 or 💰")
+            raise ValueError(f"Programmer Error! Cup only applies to {constants.HEART} or {constants.INFLUENCE}")
         if self._got_heart and self._got_influence:
             self.completed = True
 
@@ -350,29 +354,29 @@ class Cup(Horcrux):
 
 class Diadem(Horcrux):
     def __init__(self):
-        super().__init__("Diadem", "If the active hero has one ally, item, and spell, lose 2💜", "1/turn: discard a card to roll the Ravenclaw die")
+        super().__init__("Diadem", f"If the active hero has one ally, item, and spell, lose 2{constants.HEART}", "1/turn: discard a card to roll the Ravenclaw die")
         self._got_card = False
         self._got_damage = False
 
     def _display_to_complete(self, window):
-        window.addstr("roll 🃏")
+        window.addstr(f"roll {constants.CARD}")
         if self._got_card:
             window.addstr("✔", curses.A_BOLD | curses.color_pair(1))
-        window.addstr(" and ↯")
+        window.addstr(f" and {constants.DAMAGE}")
         if self._got_damage:
             window.addstr("✔", curses.A_BOLD | curses.color_pair(1))
 
     def die_roll_applies(self, game, result):
-        return ((result == "🃏" and not self._got_card) or
-                (result == "↯" and not self._got_damage)) and not self.completed
+        return ((result == f"{constants.CARD}" and not self._got_card) or
+                (result == constants.DAMAGE and not self._got_damage)) and not self.completed
 
     def apply_die_roll(self, game, result):
-        if result == "🃏":
+        if result == constants.CARD:
             self._got_card = True
-        elif result == "↯":
+        elif result == constants.DAMAGE:
             self._got_damage = True
         else:
-            raise ValueError("Programmer Error! Diadem only applies to 🃏 or ↯")
+            raise ValueError(f"Programmer Error! Diadem only applies to {constants.CARD} or {constants.DAMAGE}")
         if self._got_card and self._got_damage:
             self.completed = True
 
@@ -380,7 +384,7 @@ class Diadem(Horcrux):
         hero = game.heroes.active_hero
         types_in_hand = set(type(card) for card in hero._hand)
         if types_in_hand.issuperset(set([hogwarts.Ally, hogwarts.Item, hogwarts.Spell])):
-            game.log(f"{self.name}: {hero.name} has one ally, item, and spell; loses 2💜")
+            game.log(f"{self.name}: {hero.name} has one ally, item, and spell; loses 2{constants.HEART}")
             hero.remove_health(game, 2)
 
     def reward_effect(self, game):
@@ -408,36 +412,36 @@ class Diadem(Horcrux):
 
 class Nagini(Horcrux):
     def __init__(self):
-        super().__init__("Nagini", "Active hero loses 1💜 and cannot gain 💜", "1/game: discard this to remove 3💀")
+        super().__init__("Nagini", f"Active hero loses 1{constants.HEART} and cannot gain {constants.HEART}", f"1/game: discard this to remove 3{constants.CONTROL}")
         self._got_damage = False
         self._got_card = False
         self._got_heart = False
 
     def _display_to_complete(self, window):
-        window.addstr("roll ↯")
+        window.addstr(f"roll {constants.DAMAGE}")
         if self._got_damage:
             window.addstr("✔", curses.A_BOLD | curses.color_pair(1))
-        window.addstr(" and 🃏")
+        window.addstr(f" and {constants.CARD}")
         if self._got_card:
             window.addstr("✔", curses.A_BOLD | curses.color_pair(1))
-        window.addstr(" and 💜")
+        window.addstr(f" and {constants.HEART}")
         if self._got_heart:
             window.addstr("✔", curses.A_BOLD | curses.color_pair(1))
 
     def die_roll_applies(self, game, result):
-        return ((result == "↯" and not self._got_damage) or
-                (result == "🃏" and not self._got_card) or
-                (result == "💜" and not self._got_heart)) and not self.completed
+        return ((result == constants.DAMAGE and not self._got_damage) or
+                (result == constants.CARD and not self._got_card) or
+                (result == constants.HEART and not self._got_heart)) and not self.completed
 
     def apply_die_roll(self, game, result):
-        if result == "↯":
+        if result == constants.DAMAGE:
             self._got_damage = True
-        elif result == "🃏":
+        elif result == constants.CARD:
             self._got_card = True
-        elif result == "💜":
+        elif result == constants.HEART:
             self._got_heart = True
         else:
-            raise ValueError("Programmer Error! Nagini only applies to ↯ or 🃏 or 💜")
+            raise ValueError(f"Programmer Error! Nagini only applies to {constants.DAMAGE} or {constants.CARD} or {constants.HEART}")
         if self._got_damage and self._got_card and self._got_heart:
             self.completed = True
 
@@ -449,7 +453,7 @@ class Nagini(Horcrux):
         game.heroes.active_hero.add_action(game, 'N', "(N)agini", self.__reward_action)
 
     def __reward_action(self, game):
-        game.log(f"{self.name} discarded to remove 3💀")
+        game.log(f"{self.name} discarded to remove 3{constants.CONTROL}")
         game.heroes.active_hero._encounters.remove(self)
         game.locations.remove_control(game, 3)
 

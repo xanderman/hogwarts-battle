@@ -6,6 +6,7 @@ import argparse
 import curses
 import random
 
+import constants
 import dark_arts
 import encounters
 import heroes
@@ -37,7 +38,8 @@ class Game(object):
         hogwarts_window = window.subwin(15, curses.COLS // 2, 7, curses.COLS // 2)
         self.hogwarts_deck = hogwarts.HogwartsDeck(hogwarts_window, game_num)
 
-        self._heroes_height = 40 if len(chosen_heroes) > 2 else 20
+        # self._heroes_height = 40 if len(chosen_heroes) > 2 else 20
+        self._heroes_height = (curses.LINES - 22) // 4 * 3
         self._heroes_window = window.subwin(self._heroes_height, curses.COLS, 22, 0)
         self.heroes = heroes.Heroes(self._heroes_window, game_num, chosen_heroes)
 
@@ -167,24 +169,28 @@ class Game(object):
         self.heroes.next()
 
     def roll_gryffindor_die(self, times=1):
+        faces = [constants.INFLUENCE, constants.INFLUENCE, constants.INFLUENCE, constants.HEART, constants.CARD, constants.DAMAGE]
         for _ in range(times):
             self.log("Rolling Gryffindor die")
-            self._roll_die("💰💰💰💜🃏↯")
+            self._roll_die(faces)
 
     def roll_hufflepuff_die(self, times=1):
+        faces = [constants.INFLUENCE, constants.HEART, constants.HEART, constants.HEART, constants.CARD, constants.DAMAGE]
         for _ in range(times):
             self.log("Rolling Hufflepuff die")
-            self._roll_die("💰💜💜💜🃏↯")
+            self._roll_die(faces)
 
     def roll_ravenclaw_die(self, times=1):
+        faces = [constants.INFLUENCE, constants.HEART, constants.CARD, constants.CARD, constants.CARD, constants.DAMAGE]
         for _ in range(times):
             self.log("Rolling Ravenclaw die")
-            self._roll_die("💰💜🃏🃏🃏↯")
+            self._roll_die(faces)
 
     def roll_slytherin_die(self, times=1):
+        faces = [constants.INFLUENCE, constants.HEART, constants.CARD, constants.DAMAGE, constants.DAMAGE, constants.DAMAGE]
         for _ in range(times):
             self.log("Rolling Slytherin die")
-            self._roll_die("💰💜🃏↯↯↯")
+            self._roll_die(faces)
 
     def _roll_die(self, options):
         die_result = random.choice(options)
@@ -193,17 +199,17 @@ class Game(object):
         if self.encounters.current.die_roll_applies(self, die_result) and self.input(f"Rolled {die_result}, apply to encounter? (y/n): ", "yn") == "y":
             self.encounters.current.apply_die_roll(self, die_result)
             return
-        if die_result == "↯":
-            self.log("Rolled ↯, ALL heroes gain 1↯")
+        if die_result == constants.DAMAGE:
+            self.log(f"Rolled {constants.DAMAGE}, ALL heroes gain 1{constants.DAMAGE}")
             self.heroes.all_heroes.add_damage(self, 1)
-        elif die_result == "💰":
-            self.log("Rolled 💰, ALL heroes gain 1💰")
+        elif die_result == constants.INFLUENCE:
+            self.log(f"Rolled {constants.INFLUENCE}, ALL heroes gain 1{constants.INFLUENCE}")
             self.heroes.all_heroes.add_influence(self, 1)
-        elif die_result == "💜":
-            self.log("Rolled 💜, ALL heroes gain 1💜")
+        elif die_result == constants.HEART:
+            self.log(f"Rolled {constants.HEART}, ALL heroes gain 1{constants.HEART}")
             self.heroes.all_heroes.add_health(self, 1)
-        elif die_result == "🃏":
-            self.log("Rolled 🃏, ALL heroes draw a card")
+        elif die_result == constants.CARD:
+            self.log(f"Rolled {constants.CARD}, ALL heroes draw a card")
             self.heroes.all_heroes.draw(self)
 
 

@@ -1,5 +1,7 @@
 import curses
 
+import constants
+
 class Locations(object):
     def __init__(self, window, game_num):
         self._window = window
@@ -59,7 +61,7 @@ class Locations(object):
 
     def add_control(self, game, amount=1):
         if amount < 0 and not self._control_remove_allowed:
-            game.log("💀 cannot be removed!")
+            game.log(f"{constants.CONTROL} cannot be removed!")
             return
         self.current._add_control(game, amount, self._control_callbacks)
 
@@ -82,7 +84,7 @@ class Location(object):
         self._control = 0
 
     def __str__(self):
-        return f"{self.name} ({self._control}/{self._control_max}💀), {self.dark_arts_count} dark arts"
+        return f"{self.name} ({self._control}/{self._control_max}{constants.CONTROL}), {self.dark_arts_count} dark arts"
 
     def _reveal(self, game):
         game.log(f"Moving to location {self.name}! {self.desc}")
@@ -94,10 +96,10 @@ class Location(object):
         action = "added" if amount > 0 else "removed"
         if self._control > self._control_max:
             self._control = self._control_max
-            game.log(f"{self.name} is full of 💀! Only {action} {self._control - control_start}💀")
+            game.log(f"{self.name} is full of {constants.CONTROL}! Only {action} {self._control - control_start}{constants.CONTROL}")
         if self._control < 0:
             self._control = 0
-            game.log(f"{self.name} is empty of 💀! Only {action} {self._control - control_start}💀")
+            game.log(f"{self.name} is empty of {constants.CONTROL}! Only {action} {self._control - control_start}{constants.CONTROL}")
         if self._control != control_start:
             for callback in callbacks:
                 callback.control_callback(game, self._control - control_start)
@@ -188,7 +190,7 @@ def castle_effect(game):
 
 def castle_action(game):
     if game.heroes.active_hero._damage_tokens < 5:
-        game.log("Not enough ↯ to use Hogwarts Castle")
+        game.log(f"Not enough {constants.DAMAGE} to use Hogwarts Castle")
         return
     game.heroes.active_hero.remove_damage(game, 5)
     game.locations.remove_control(game)
@@ -197,7 +199,7 @@ game_seven_locations = [
     Location("Godric's Hollow", 1, 6),
     Location("Gringotts", 2, 6),
     Location("Room of Requirement", 2, 7),
-    Location("Hogwarts Castle", 3, 8, "ALL heroes lose 2💜, may spend 5↯ to remove 1💀", castle_effect, ('H', "(H)ogwarts Castle", castle_action)),
+    Location("Hogwarts Castle", 3, 8, f"ALL heroes lose 2{constants.HEART}, may spend 5{constants.DAMAGE} to remove 1{constants.CONTROL}", castle_effect, ('H', "(H)ogwarts Castle", castle_action)),
 ]
 
 LOCATIONS = [

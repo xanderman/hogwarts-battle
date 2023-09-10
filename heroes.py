@@ -3,13 +3,11 @@ from collections import namedtuple
 import curses
 import random
 
+import constants
 import hogwarts
 
 class QuitGame(Exception):
     pass
-
-
-Action = namedtuple("Action", ["key", "description", "action"])
 
 
 class Heroes(object):
@@ -235,7 +233,7 @@ class Hero(object):
 
     def display_state(self, window, i, attr):
         window.clear()
-        window.addstr(f"{i}: {self.name} ({self._health}💜 {self._damage_tokens}ϟ {self._influence_tokens}💰) -- Deck: {len(self._deck)}, Discard: {len(self._discard)}\n", attr)
+        window.addstr(f"{i}: {self.name} ({self._health}{constants.HEART} {self._damage_tokens}{constants.DAMAGE} {self._influence_tokens}{constants.INFLUENCE}) -- Deck: {len(self._deck)}, Discard: {len(self._discard)}\n", attr)
         if self.ability_description is not None:
             window.addstr(f"{self.ability_description}\n")
         self._proficiency.display_state(window)
@@ -279,7 +277,7 @@ class Hero(object):
             game.log(f"{self.name}: healing not allowed!")
             return
         if amount < -1 and any(card.name == "Invisibility cloak" for card in self._hand):
-            game.log(f"Invisibility cloak prevents {-1 - amount}↯!")
+            game.log(f"Invisibility cloak prevents {-1 - amount}{constants.DAMAGE}!")
             amount = -1
         if amount < 0:
             game.log(f"{self.name} loses {-amount} health!")
@@ -431,7 +429,7 @@ class Hero(object):
 
     def buy_card(self, game):
         if self._influence_tokens == 0:
-            game.log("No 💰 to spend!")
+            game.log(f"No {constants.INFLUENCE} to spend!")
             return
         if len(game.hogwarts_deck._market) == 0:
             game.log("No cards to buy!")
@@ -441,11 +439,11 @@ class Hero(object):
         if choice == "c":
             return
         choice = game.hogwarts_deck[int(choice)]
-        game.log(f"Buying {choice.name} ({choice.cost}💰; {choice.description})")
+        game.log(f"Buying {choice.name} ({choice.cost}{constants.INFLUENCE}; {choice.description})")
         cost = choice.cost
         cost += self._proficiency.cost_modifier(game, choice)
         if self._influence_tokens < cost:
-            game.log("Not enough 💰!")
+            game.log(f"Not enough {constants.INFLUENCE}!")
             return
         self._influence_tokens -= cost
         card = game.hogwarts_deck.remove(choice.name)
@@ -486,7 +484,7 @@ class Hero(object):
 
     def add_damage(self, game, amount=1):
         if amount > 0 and game.heroes.active_hero != self and not self.gaining_tokens_allowed(game):
-            game.log(f"{self.name}: gaining ↯ on other heroes' turns not allowed!")
+            game.log(f"{self.name}: gaining {constants.DAMAGE} on other heroes' turns not allowed!")
             return
         self._damage_tokens += amount
         if self._damage_tokens < 0:
@@ -497,13 +495,13 @@ class Hero(object):
 
     def assign_damage(self, game):
         if self._damage_tokens == 0:
-            game.log("No ↯ to assign!")
+            game.log(f"No {constants.DAMAGE} to assign!")
             return
         if len(game.villain_deck.choices) == 0:
-            game.log("No villains to assign ↯ to!")
+            game.log(f"No villains to assign {constants.DAMAGE} to!")
             return None
         choices = ['c'] + game.villain_deck.choices
-        choice = game.input("Choose villain to assign ↯ to ('c' to cancel): ", choices)
+        choice = game.input(f"Choose villain to assign {constants.DAMAGE} to ('c' to cancel): ", choices)
         if choice == 'c':
             return None
         if choice == 'v' and not game.villain_deck.voldemort_vulnerable(game):
@@ -525,7 +523,7 @@ class Hero(object):
 
     def add_influence(self, game, amount=1):
         if amount > 0 and game.heroes.active_hero != self and not self.gaining_tokens_allowed(game):
-            game.log(f"{self.name}: gaining 💰 on other heroes' turns not allowed!")
+            game.log(f"{self.name}: gaining {constants.INFLUENCE} on other heroes' turns not allowed!")
             return
         self._influence_tokens += amount
         if self._influence_tokens < 0:
@@ -563,7 +561,7 @@ class Hero(object):
         while True:
             game.display_state()
             actions = ["p", "a", "b", "e", "q"]
-            prompt = "Select (p)lay card, (a)ssign ↯, (b)uy card"
+            prompt = f"Select (p)lay card, (a)ssign {constants.DAMAGE}, (b)uy card"
             for key, (description, _) in self._extra_actions.items():
                 actions.append(key)
                 prompt += f", {description}"
@@ -624,14 +622,14 @@ class Hero(object):
 def base_ally_effect(game):
     hero = game.heroes.active_hero
     if hero._health == hero._max_health:
-        game.log(f"{hero.name} is already at max health, gaining 1↯")
+        game.log(f"{hero.name} is already at max health, gaining 1{constants.DAMAGE}")
         hero.add_damage(game, 1)
         return
     if not hero.healing_allowed:
-        game.log(f"{hero.name} can't heal, gaining 1↯")
+        game.log(f"{hero.name} can't heal, gaining 1{constants.DAMAGE}")
         hero.add_damage(game, 1)
         return
-    choice = game.input("Choose effect: (d)↯, (h)💜: ", "dh")
+    choice = game.input(f"Choose effect: (d){constants.DAMAGE}, (h){constants.HEART}: ", "dh")
     if choice == "d":
         hero.add_damage(game, 1)
     elif choice == "h":
@@ -639,10 +637,10 @@ def base_ally_effect(game):
 
 def beedle_effect(game):
     if len(game.heroes) == 1:
-        game.log("Only one hero, gaining 2💰")
+        game.log(f"Only one hero, gaining 2{constants.INFLUENCE}")
         choice = "y"
     else:
-        choice = game.input("Choose effect: (y)ou get 2💰, (a)ll get 1💰: ", "ya")
+        choice = game.input(f"Choose effect: (y)ou get 2{constants.INFLUENCE}, (a)ll get 1{constants.INFLUENCE}: ", "ya")
 
     if choice == "y":
         game.heroes.active_hero.add_influence(game, 2)
@@ -672,12 +670,12 @@ def beans_effect(game):
 
 def mandrake_effect(game):
     if not game.heroes.healing_allowed:
-        game.log(f"Healing not allowed, gaining 1↯")
+        game.log(f"Nobody can heal, gaining 1{constants.DAMAGE}")
         game.heroes.active_hero.add_damage(game, 1)
         return
     choices = ['d'] + [str(i) for i in range(len(game.heroes))]
     while True:
-        choice = game.input("Choose hero to gain 2💜 or (d)↯: ", choices)
+        choice = game.input(f"Choose hero to gain 2{constants.HEART} or (d){constants.DAMAGE}: ", choices)
         if choice == "d":
             game.heroes.active_hero.add_damage(game)
             break
@@ -689,7 +687,11 @@ def mandrake_effect(game):
         break
 
 def bat_bogey_effect(game):
-    choice =  game.input("Choose effect: (d)↯, (h) ALL heroes get 1💜: ", "dh")
+    if not game.heroes.healing_allowed:
+        game.log(f"Nobody can heal, gaining 1{constants.DAMAGE}")
+        game.heroes.active_hero.add_damage(game, 1)
+        return
+    choice =  game.input(f"Choose effect: (d){constants.DAMAGE}, (h) ALL heroes get 1{constants.HEART}: ", "dh")
     if choice == "d":
         game.heroes.active_hero.add_damage(game)
     elif choice == "h":
@@ -711,7 +713,7 @@ def lion_hat_effect(game):
             continue
         for card in hero._hand:
             if card.name in broom_cards:
-                game.log(f"{hero.name} has {card.name}, {game.heroes.active_hero.name} gains 1↯")
+                game.log(f"{hero.name} has {card.name}, {game.heroes.active_hero.name} gains 1{constants.DAMAGE}")
                 game.heroes.active_hero.add_damage(game)
                 return
 
@@ -719,16 +721,16 @@ def lion_hat_effect(game):
 class Hermione(Hero):
     def __init__(self, game_num, proficiency):
         super().__init__("Hermione", game_num, [
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Ally("Crookshanks", "Gain 1↯ or 2💜", 0, base_ally_effect),
-            hogwarts.Item("Time-Turner", "Gain 1💰, may put acquired Spells on top of deck", 0, time_turner_effect),
-            hogwarts.Item("The Tales of Beedle the Bard", "Gain 2💰, or ALL heroes gain 1💰", 0, beedle_effect),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Ally("Crookshanks", f"Gain 1{constants.DAMAGE} or 2{constants.HEART}", 0, base_ally_effect),
+            hogwarts.Item("Time-Turner", f"Gain 1{constants.INFLUENCE}, may put acquired Spells on top of deck", 0, time_turner_effect),
+            hogwarts.Item("The Tales of Beedle the Bard", f"Gain 2{constants.INFLUENCE}, or ALL heroes gain 1{constants.INFLUENCE}", 0, beedle_effect),
         ], proficiency)
         self._spells_played = 0
         self._used_ability = False
@@ -738,8 +740,8 @@ class Hermione(Hero):
         if self._game_num < 3:
             return None
         if self._game_num < 7:
-            return "If you play 4 or more spells, one hero gains 1💰"
-        return "If you play 4 or more spells, ALL heroes gain 1💰"
+            return f"If you play 4 or more spells, one hero gains 1{constants.INFLUENCE}"
+        return f"If you play 4 or more spells, ALL heroes gain 1{constants.INFLUENCE}"
 
     def play_turn(self, game):
         self._spells_played = 0
@@ -760,30 +762,30 @@ class Hermione(Hero):
             self._game_three_ability(game)
 
     def _game_three_ability(self, game):
-        game.heroes.choose_hero(game, prompt=f"{self.name} played 4 Spells, choose hero to gain 1💰: ").add_influence(game, 1)
+        game.heroes.choose_hero(game, prompt=f"{self.name} played 4 Spells, choose hero to gain 1{constants.INFLUENCE}: ").add_influence(game, 1)
 
     def _game_seven_ability(self, game):
-        game.log(f"{self.name} played 4 Spells, ALL heroes gain 1💰: ")
+        game.log(f"{self.name} played 4 Spells, ALL heroes gain 1{constants.INFLUENCE}: ")
         game.heroes.all_heroes.add_influence(game, 1)
 
     def _monster_box_one_ability(self, game):
-        game.log(f"{self.name} played 4 spells. Two heroes gain 1↯")
-        game.heroes.choose_two_heroes(game, prompt="to gain 1↯").add_damage(game, 1)
+        game.log(f"{self.name} played 4 spells. Two heroes gain 1{constants.DAMAGE}")
+        game.heroes.choose_two_heroes(game, prompt=f"to gain 1{constants.DAMAGE}").add_damage(game, 1)
 
 
 class Ron(Hero):
     def __init__(self, game_num, proficiency):
         super().__init__("Ron", game_num, [
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Ally("Pigwidgeon", "Gain 1↯ or 2💜", 0, base_ally_effect),
-            hogwarts.Item("Every-flavour Beans", "Gain 1💰; for each Ally played, gain 1↯", 0, beans_effect),
-            hogwarts.Item("Cleansweep 11", "Gain 1↯; if you defeat a Villain, gain 1💰", 0, broom_effect),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Ally("Pigwidgeon", f"Gain 1{constants.DAMAGE} or 2{constants.HEART}", 0, base_ally_effect),
+            hogwarts.Item("Every-flavour Beans", f"Gain 1{constants.INFLUENCE}; for each Ally played, gain 1{constants.DAMAGE}", 0, beans_effect),
+            hogwarts.Item("Cleansweep 11", f"Gain 1{constants.DAMAGE}; if you defeat a Villain, gain 1{constants.INFLUENCE}", 0, broom_effect),
         ], proficiency)
         self._damage_assigned = 0
         self._used_ability = False
@@ -793,8 +795,8 @@ class Ron(Hero):
         if self._game_num < 3:
             return None
         if self._game_num < 7:
-            return "If you assign 3 or more ↯, one hero gains 2💜"
-        return "If you assign 3 or more ↯, ALL heroes gain 2💜"
+            return f"If you assign 3 or more {constants.DAMAGE}, one hero gains 2{constants.HEART}"
+        return f"If you assign 3 or more {constants.DAMAGE}, ALL heroes gain 2{constants.HEART}"
 
     def assign_damage(self, game):
         villain = super().assign_damage(game)
@@ -816,30 +818,30 @@ class Ron(Hero):
         super().play_turn(game)
 
     def _game_three_ability(self, game):
-        game.heroes.choose_hero(game, prompt=f"{self.name} assigned 3 or more ↯, choose hero to gain 2💜: ").add_health(game, 2)
+        game.heroes.choose_hero(game, prompt=f"{self.name} assigned 3 or more {constants.DAMAGE}, choose hero to gain 2{constants.HEART}: ").add_health(game, 2)
 
     def _game_seven_ability(self, game):
-        game.log(f"{self.name} assigned 3 or more ↯, all heroes gain 2💜")
+        game.log(f"{self.name} assigned 3 or more {constants.DAMAGE}, all heroes gain 2{constants.HEART}")
         game.heroes.all_heroes.add_health(game, 2)
 
     def _monster_box_one_ability(self, game):
-        game.log(f"{self.name} assigned 3 or more ↯/💰, all heroes gain 1💜")
+        game.log(f"{self.name} assigned 3 or more {constants.DAMAGE}/{constants.INFLUENCE}, all heroes gain 1{constants.HEART}")
         game.heroes.all_heroes.add_health(game, 1)
 
 
 class Harry(Hero):
     def __init__(self, game_num, proficiency):
         super().__init__("Harry", game_num, [
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Ally("Hedwig", "Gain 1↯ or 2💜", 0, base_ally_effect),
-            hogwarts.Item("Invisibility cloak", "Gain 1💰; if in hand, take only 1↯ from each Villain or Dark Arts", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Item("Firebolt", "Gain 1↯; if you defeat a Villain, gain 1💰", 0, broom_effect),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Ally("Hedwig", f"Gain 1{constants.DAMAGE} or 2{constants.HEART}", 0, base_ally_effect),
+            hogwarts.Item("Invisibility cloak", f"Gain 1{constants.INFLUENCE}; if in hand, take only 1{constants.DAMAGE} from each Villain or Dark Arts", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Item("Firebolt", f"Gain 1{constants.DAMAGE}; if you defeat a Villain, gain 1{constants.INFLUENCE}", 0, broom_effect),
         ], proficiency)
         self._used_ability = False
 
@@ -848,8 +850,8 @@ class Harry(Hero):
         if self._game_num < 3:
             return None
         if self._game_num < 7:
-            return "The first time 💀 is removed on any turn, one hero gains 1↯"
-        return "The first time 💀 is removed on any turn, two heroes gain 1↯"
+            return f"The first time {constants.CONTROL} is removed on any turn, one hero gains 1{constants.DAMAGE}"
+        return f"The first time {constants.CONTROL} is removed on any turn, two heroes gain 1{constants.DAMAGE}"
 
     def control_callback(self, game, amount):
         if amount > -1:
@@ -864,16 +866,16 @@ class Harry(Hero):
     def _game_three_ability_control_callback(self, game, amount):
         if self._used_ability:
             return
-        game.heroes.choose_hero(game, prompt=f"{self.name}: first 💀 removed this turn, choose hero to gain 1↯: ").add_damage(game, 1)
+        game.heroes.choose_hero(game, prompt=f"{self.name}: first {constants.CONTROL} removed this turn, choose hero to gain 1{constants.DAMAGE}: ").add_damage(game, 1)
 
     def _game_seven_ability_control_callback(self, game, amount):
         if self._used_ability:
             return
-        game.log(f"{self.name}: first 💀 removed this turn, two heroes gain 1↯")
-        game.heroes.choose_two_heroes(game, prompt="to gain 1↯").add_damage(game, 1)
+        game.log(f"{self.name}: first {constants.CONTROL} removed this turn, two heroes gain 1{constants.DAMAGE}")
+        game.heroes.choose_two_heroes(game, prompt=f"to gain 1{constants.DAMAGE}").add_damage(game, 1)
 
     def _monster_box_one_ability_control_callback(self, game, amount):
-        game.log(f"{self.name}: 💀 removed, ALL heroes gain 1💜 for each")
+        game.log(f"{self.name}: {constants.CONTROL} removed, ALL heroes gain 1{constants.HEART} for each")
         for _ in range(amount):
             game.heroes.all_heroes.add_health(game, 1)
 
@@ -881,16 +883,16 @@ class Harry(Hero):
 class Neville(Hero):
     def __init__(self, game_num, proficiency):
         super().__init__("Neville", game_num, [
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Ally("Trevor", "Gain 1↯ or 2💜", 0, base_ally_effect),
-            hogwarts.Item("Remembrall", "Gain 1💰; if discarded, gain 2💰", 0, lambda game: game.heroes.active_hero.add_influence(game), discard_effect=lambda game, hero: hero.add_influence(game, 2)),
-            hogwarts.Item("Mandrake", "Gain 1↯, or one hero gains 2💜", 0, mandrake_effect),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Ally("Trevor", f"Gain 1{constants.DAMAGE} or 2{constants.HEART}", 0, base_ally_effect),
+            hogwarts.Item("Remembrall", f"Gain 1{constants.INFLUENCE}; if discarded, gain 2{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game), discard_effect=lambda game, hero: hero.add_influence(game, 2)),
+            hogwarts.Item("Mandrake", f"Gain 1{constants.DAMAGE}, or one hero gains 2{constants.HEART}", 0, mandrake_effect),
         ], proficiency)
         self._healed_heroes = set()
 
@@ -899,8 +901,8 @@ class Neville(Hero):
         if self._game_num < 3:
             return None
         if self._game_num < 7:
-            return "The first time a hero gains 💜 on your turn, that hero gains +1💜"
-        return "Each time a hero gains 💜 on your turn, that hero gains +1💜"
+            return f"The first time a hero gains {constants.HEART} on your turn, that hero gains +1{constants.HEART}"
+        return f"Each time a hero gains {constants.HEART} on your turn, that hero gains +1{constants.HEART}"
 
     def health_callback(self, game, hero, amount, source):
         if source == self:
@@ -917,13 +919,13 @@ class Neville(Hero):
         if amount < 1:
             return
         self._healed_heroes.add(hero)
-        game.log(f"First time {self.name} healed {hero.name} this turn, {hero.name} gets an extra 💜")
+        game.log(f"First time {self.name} healed {hero.name} this turn, {hero.name} gets an extra {constants.HEART}")
         hero.add_health(game, 1, source=self)
 
     def _game_seven_ability_healing_callback(self, game, hero, amount):
         if amount < 1:
             return
-        game.log(f"{self.name} healed {hero.name}, {hero.name} gets an extra 💜")
+        game.log(f"{self.name} healed {hero.name}, {hero.name} gets an extra {constants.HEART}")
         hero.add_health(game, 1, source=self)
 
     def _monster_box_one_ability_healing_callback(self, game, hero, amount):
@@ -931,9 +933,17 @@ class Neville(Hero):
             return
         if amount < 1:
             return
+        game.log(f"First time {self.name} healed {hero.name} this turn, {hero.name} gets an extra {constants.HEART} or {constants.INFLUENCE}")
+        if not hero.healing_allowed:
+            game.log(f"{hero.name} can't heal, {hero.name} gains 1{constants.INFLUENCE}")
+            hero.add_influence(game, 1)
+            return
+        if not hero.gaining_tokens_allowed(game):
+            game.log(f"{hero.name} can't gain tokens, {hero.name} gains 1{constants.HEART}")
+            hero.add_health(game, 1)
+            return
         self._healed_heroes.add(hero)
-        game.log(f"First time {self.name} healed {hero.name} this turn, {hero.name} gets an extra 💜 or 💰")
-        choice = game.input("Choose effect: (h)💜, (i)💰: ", "hi")
+        choice = game.input(f"Choose effect: (h){constants.HEART}, (i){constants.INFLUENCE}: ", "hi")
         if choice == "h":
             hero.add_health(game, 1)
         elif choice == "i":
@@ -949,16 +959,16 @@ class Neville(Hero):
 class Ginny(Hero):
     def __init__(self, game_num, proficiency):
         super().__init__("Ginny", game_num, [
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Ally("Arnold", "Gain 1↯ or 2💜", 0, base_ally_effect),
-            hogwarts.Item("Nimbus 2000", "Gain 1↯; if you defeat a Villian, gain 1💰", 0, broom_effect),
-            hogwarts.Spell("Bat Bogey Hex", "Gain 1↯, or ALL heroes gain 1💜", 0, bat_bogey_effect),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Ally("Arnold", f"Gain 1{constants.DAMAGE} or 2{constants.HEART}", 0, base_ally_effect),
+            hogwarts.Item("Nimbus 2000", f"Gain 1{constants.DAMAGE}; if you defeat a Villian, gain 1{constants.INFLUENCE}", 0, broom_effect),
+            hogwarts.Spell("Bat Bogey Hex", f"Gain 1{constants.DAMAGE}, or ALL heroes gain 1{constants.HEART}", 0, bat_bogey_effect),
         ], proficiency)
         self._villains_damaged = set()
         self._used_ability = False
@@ -967,7 +977,7 @@ class Ginny(Hero):
     def ability_description(self):
         if self._game_num < 3:
             return None
-        return "If you assign ↯ to 2 or more villains, ALL heroes gain 1💰"
+        return f"If you assign {constants.DAMAGE} to 2 or more villains, ALL heroes gain 1{constants.INFLUENCE}"
 
     def assign_damage(self, game):
         villain = super().assign_damage(game)
@@ -977,7 +987,7 @@ class Ginny(Hero):
         if self._game_num < 3 or len(self._villains_damaged) != 2 or self._used_ability:
             return
         self._used_ability = True
-        game.log(f"{self.name} assigned ↯/💰 to 2 or more villains, ALL heroes gain 1💰")
+        game.log(f"{self.name} assigned {constants.DAMAGE}/{constants.INFLUENCE} to 2 or more villains, ALL heroes gain 1{constants.INFLUENCE}")
         game.heroes.all_heroes.add_influence(game, 1)
 
     def play_turn(self, game):
@@ -989,16 +999,16 @@ class Ginny(Hero):
 class Luna(Hero):
     def __init__(self, game_num, proficiency):
         super().__init__("Luna", game_num, [
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", "Gain 1💰", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Ally("Crumple-horned Snorkack", "Gain 1↯ or 2💜", 0, base_ally_effect),
-            hogwarts.Item("Spectrespecs", "Gain 1💰; you may reveal the top Dark Arts and choose to discard it", 0, spectrespecs_effect),
-            hogwarts.Item("Lion Hat", "Gain 1💰; if another hero has broom or quidditch gear, gain 1↯", 0, lion_hat_effect),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
+            hogwarts.Ally("Crumple-horned Snorkack", f"Gain 1{constants.DAMAGE} or 2{constants.HEART}", 0, base_ally_effect),
+            hogwarts.Item("Spectrespecs", f"Gain 1{constants.INFLUENCE}; you may reveal the top Dark Arts and choose to discard it", 0, spectrespecs_effect),
+            hogwarts.Item("Lion Hat", f"Gain 1{constants.INFLUENCE}; if another hero has broom or quidditch gear, gain 1{constants.DAMAGE}", 0, lion_hat_effect),
         ], proficiency)
         self._used_ability = False
 
@@ -1006,13 +1016,13 @@ class Luna(Hero):
     def ability_description(self):
         if self._game_num < 3:
             return None
-        return "If you draw at least one extra card, one hero gains 2💜"
+        return f"If you draw at least one extra card, one hero gains 2{constants.HEART}"
 
     def draw(self, game, count=1, end_of_turn=False):
         cards_before = len(self._hand)
         super().draw(game, count, end_of_turn)
         if not end_of_turn and self._game_num >= 3 and len(self._hand) > cards_before and not self._used_ability:
-            game.heroes.choose_hero(game, prompt=f"{self.name} drew first extra card, choose hero to gain 2💜: ").add_health(game, 2)
+            game.heroes.choose_hero(game, prompt=f"{self.name} drew first extra card, choose hero to gain 2{constants.HEART}: ").add_health(game, 2)
             self._used_ability = True
 
     def play_turn(self, game):

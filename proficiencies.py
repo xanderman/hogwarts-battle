@@ -2,6 +2,7 @@ from collections import Counter
 
 import random
 
+import constants
 import hogwarts
 
 class Proficiency(object):
@@ -43,7 +44,7 @@ class NullProficiency(Proficiency):
 
 class FlyingLessons(Proficiency):
     def __init__(self):
-        super().__init__("Flying Lessons", "1/turn: pay 5💰 to remove 1💀")
+        super().__init__("Flying Lessons", f"1/turn: pay 5{constants.INFLUENCE} to remove 1{constants.CONTROL}")
 
     def start_turn(self, game):
         game.heroes.active_hero.add_action(game, 'f', "(f)lying lessons", self._use_ability)
@@ -53,12 +54,12 @@ class FlyingLessons(Proficiency):
             game.log("Flying Lessons already used this turn")
             return
         if game.locations.current._control == 0:
-            game.log("No 💀 to remove with Flying Lessons")
+            game.log(f"No {constants.CONTROL} to remove with Flying Lessons")
             return
         if game.heroes.active_hero._influence_tokens < 5:
-            game.log("Not enough 💰 to use Flying Lessons")
+            game.log(f"Not enough {constants.INFLUENCE} to use Flying Lessons")
             return
-        game.log("Flying Lessons used to remove 1💀")
+        game.log(f"Flying Lessons used to remove 1{constants.CONTROL}")
         game.heroes.active_hero.remove_influence(game, 5)
         game.locations.remove_control(game)
         self._used_ability = True
@@ -66,7 +67,7 @@ class FlyingLessons(Proficiency):
 
 class Charms(Proficiency):
     def __init__(self):
-        super().__init__("Charms", "1/turn: discard 2 spells; ALL heroes gain 1💰 and draw a card")
+        super().__init__("Charms", f"1/turn: discard 2 spells; ALL heroes gain 1{constants.INFLUENCE} and draw a card")
 
     def start_turn(self, game):
         game.heroes.active_hero.add_action(game, 'c', "(c)harms", self._use_ability)
@@ -117,7 +118,7 @@ class Charms(Proficiency):
 
 class Transfiguration(Proficiency):
     def __init__(self):
-        super().__init__("Transfiguration", "1/turn: discard an item to take card with cost 5💰 or less from deck")
+        super().__init__("Transfiguration", f"1/turn: discard an item to take card with cost 5{constants.INFLUENCE} or less from deck")
 
     def start_turn(self, game):
         game.heroes.active_hero.add_action(game, 't', "(t)ransfiguration", self._use_ability)
@@ -162,7 +163,7 @@ class Transfiguration(Proficiency):
 
 class Herbology(Proficiency):
     def __init__(self):
-        super().__init__("Herbology", "If a Hero gains 3 or more 💜 on your turn, that Hero draws a card")
+        super().__init__("Herbology", f"If a Hero gains 3 or more {constants.HEART} on your turn, that Hero draws a card")
         self._healing = Counter()
         self._used_ability = set()
 
@@ -179,31 +180,31 @@ class Herbology(Proficiency):
             return
         self._healing[hero] += amount
         if self._healing[hero] >= 3 and hero not in self._used_ability:
-            game.log(f"{self.name}: {hero.name} gained {self._healing[hero]}💜 this turn, drawing a card")
+            game.log(f"{self.name}: {hero.name} gained {self._healing[hero]}{constants.HEART} this turn, drawing a card")
             self._used_ability.add(hero)
             hero.draw(game, 1)
 
 
 class DefenseAgainstTheDarkArts(Proficiency):
     def __init__(self):
-        super().__init__("Defense Against the Dark Arts", "If forced to discard, gain 1↯ and 1💜")
+        super().__init__("Defense Against the Dark Arts", f"If forced to discard, gain 1{constants.DAMAGE} and 1{constants.HEART}")
 
     def start_game(self, hero):
         hero.add_discard_callback(None, self)
 
     def discard_callback(self, game, hero):
-        game.log(f"{self.name}: {hero.name} discarded a card, gaining 1↯ and 1💜")
+        game.log(f"{self.name}: {hero.name} discarded a card, gaining 1{constants.DAMAGE} and 1{constants.HEART}")
         hero.add(game, damage=1, hearts=1)
 
 
 class Arithmancy(Proficiency):
     def __init__(self):
-        super().__init__("Arithmancy", "Cards that roll a house die cost 1💰 less; you can reroll house dice once")
+        super().__init__("Arithmancy", f"Cards that roll a house die cost 1{constants.INFLUENCE} less; you can reroll house dice once")
 
     def cost_modifier(self, game, card):
         if not card.rolls_house_die:
             return 0
-        game.log(f"{self.name}: {card.name} costs 1💰 less")
+        game.log(f"{self.name}: {card.name} costs 1{constants.INFLUENCE} less")
         return -1
 
     @property
@@ -213,7 +214,7 @@ class Arithmancy(Proficiency):
 
 class Potions(Proficiency):
     def __init__(self):
-        super().__init__("Potions", "If you play at least one ally, item, and spell, one hero gains 1↯ and 1💜")
+        super().__init__("Potions", f"If you play at least one ally, item, and spell, one hero gains 1{constants.DAMAGE} and 1{constants.HEART}")
         self._types_played = set()
         self._wanted_types = set([hogwarts.Ally, hogwarts.Item, hogwarts.Spell])
 
@@ -225,19 +226,19 @@ class Potions(Proficiency):
         self._types_played.add(type(card))
         if self._types_played.issuperset(self._wanted_types) and not self._used_ability:
             self._used_ability = True
-            game.heroes.choose_hero(game, prompt=f"{self.name}: played at least one ally, item, and spell. Choose hero to gain 1↯ and 1💜: ").add(game, damage=1, hearts=1)
+            game.heroes.choose_hero(game, prompt=f"{self.name}: played at least one ally, item, and spell. Choose hero to gain 1{constants.DAMAGE} and 1{constants.HEART}: ").add(game, damage=1, hearts=1)
 
 
 class HistoryOfMagic(Proficiency):
     def __init__(self):
-        super().__init__("History of Magic", "Each time you acquire a spell, one hero gains 1💰")
+        super().__init__("History of Magic", f"Each time you acquire a spell, one hero gains 1{constants.INFLUENCE}")
 
     def start_game(self, hero):
         hero.add_acquire_callback(None, self)
 
     def acquire_callback(self, game, hero, card):
         if card.is_spell():
-            game.heroes.choose_hero(game, prompt=f"{self.name}: {hero.name} acquired a spell. Choose hero to gain 1💰: ").add_influence(game, 1)
+            game.heroes.choose_hero(game, prompt=f"{self.name}: {hero.name} acquired a spell. Choose hero to gain 1{constants.INFLUENCE}: ").add_influence(game, 1)
 
 
 class Divination(Proficiency):
@@ -262,7 +263,7 @@ class Divination(Proficiency):
 # TODO: this only applies when playing with creatures
 class CareOfMagicalCreatures(Proficiency):
     def __init__(self):
-        super().__init__("Care of Magical Creatures", "The first time you assign ↯/💰 to a Creature, one hero gains 2💜; if you defeat a Creature, remove 1💀")
+        super().__init__("Care of Magical Creatures", f"The first time you assign {constants.DAMAGE}/{constants.INFLUENCE} to a Creature, one hero gains 2{constants.HEART}; if you defeat a Creature, remove 1{constants.CONTROL}")
 
 
 PROFICIENCIES = {
