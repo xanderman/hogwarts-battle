@@ -1,5 +1,5 @@
 from collections import namedtuple
-from enum import StrEnum, auto
+from enum import Enum, auto
 
 import curses
 import random
@@ -11,7 +11,7 @@ class QuitGame(Exception):
     pass
 
 
-class DisplayMode(StrEnum):
+class DisplayMode(Enum):
     DEFAULT = auto()
     HAND = auto()
     PLAY_AREA = auto()
