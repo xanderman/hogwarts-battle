@@ -104,6 +104,9 @@ def hand_of_glory_effect(game):
 
 def relashio_effect(game, hero):
     items = sum(1 for card in hero._hand if card.is_item())
+    if hero.is_stunned:
+        game.log(f"{hero.name} is stunned and can't lose {constants.HEART}. Ignoring relashio!")
+        return
     if items == 0:
         game.log(f"{hero.name} has no items to discard, losing 2{constants.HEART}")
         hero.remove_hearts(game, 2)
@@ -124,6 +127,9 @@ def relashio_effect(game, hero):
 
 def poison_effect(game, hero):
     allies = sum(1 for card in hero._hand if card.is_ally())
+    if hero.is_stunned:
+        game.log(f"{hero.name} is stunned and can't lose {constants.HEART}. Ignoring poison!")
+        return
     if allies == 0:
         game.log(f"{hero.name} has no allies to discard, losing 2{constants.HEART}")
         hero.remove_hearts(game, 2)
@@ -144,6 +150,9 @@ def poison_effect(game, hero):
 
 def obliviate_effect(game, hero):
     spells = sum(1 for card in hero._hand if card.is_spell())
+    if hero.is_stunned:
+        game.log(f"{hero.name} is stunned and can't lose {constants.HEART}. Ignoring obliviate!")
+        return
     if spells == 0:
         game.log(f"{hero.name} has no spells to discard, losing 2{constants.HEART}")
         hero.remove_hearts(game, 2)
@@ -209,9 +218,9 @@ def imperio_effect(game):
     game.dark_arts_deck.play(game, 1)
 
 def avada_kedavra_effect(game):
-    was_stunned = game.heroes.active_hero.is_stunned(game)
+    was_stunned = game.heroes.active_hero.is_stunned
     game.heroes.active_hero.remove_hearts(game, 3)
-    if not was_stunned and game.heroes.active_hero.is_stunned(game):
+    if not was_stunned and game.heroes.active_hero.is_stunned:
         game.log(f"Stunned by Avada Kedavra! Adding another {constants.CONTROL}")
         game.locations.add_control(game)
     game.dark_arts_deck.play(game, 1)

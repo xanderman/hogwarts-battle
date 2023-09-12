@@ -92,7 +92,7 @@ class Game(object):
             self.dark_arts_deck.display_state(resize=resize, size=(7, curses.COLS // 3))
         self.villain_deck.display_state(self, resize=resize, size=(15, curses.COLS // 2))
         self.hogwarts_deck.display_state(resize=resize, size=(15, curses.COLS // 2))
-        self.heroes.display_state(resize=resize, size=(self._heroes_height, curses.COLS))
+        self.heroes.display_state(self, resize=resize, size=(self._heroes_height, curses.COLS))
         curses.doupdate()
 
     def input(self, message, valid_choices=None):
@@ -202,7 +202,7 @@ class Game(object):
             die_result = random.choice(options)
         if (self.encounters is not None
             and self.encounters.current.die_roll_applies(self, die_result)
-            and self.input(f"Rolled {die_result}, apply to encounter? (y/n): ", "yn") == "y"):
+            and self.input(f"Rolled {die_result}, apply to {self.encounters.current.name}? (y/n): ", "yn") == "y"):
             self.encounters.current.apply_die_roll(self, die_result)
             return
         if die_result == constants.DAMAGE:

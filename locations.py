@@ -99,7 +99,7 @@ class Location(object):
             game.log(f"{self.name} is full of {constants.CONTROL}! Only {action} {self._control - control_start}{constants.CONTROL}")
         if self._control < 0:
             self._control = 0
-            game.log(f"{self.name} is empty of {constants.CONTROL}! Only {action} {self._control - control_start}{constants.CONTROL}")
+            game.log(f"{self.name} is empty of {constants.CONTROL}! Only {action} {abs(self._control - control_start)}{constants.CONTROL}")
         if self._control != control_start:
             for callback in callbacks:
                 callback.control_callback(game, self._control - control_start)

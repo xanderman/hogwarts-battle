@@ -47,6 +47,11 @@ keys. Pressing space will jump the log back to the bottom without changing any
 game state. Pressing a valid input key will also scroll the log to the bottom,
 and your input will be accepted.
 
+Here's an annotated screenshot for reference. This is taken from a game 7 in
+progress, with one villain defeated and not yet replaced.
+
+![annotated screenshot](annotated_screenshot.png)
+
 The game will mostly prevent you from performing illegal actions. Inputs that
 aren't one of the listed options (or navigation keys) are ignored. If you pick
 an option that breaks the rules, the log will tell you and either ask for

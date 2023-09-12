@@ -281,6 +281,9 @@ def riddle_effect(game):
     if allies == 0:
         game.log(f"{hero.name} has no allies in hand, safe!")
         return
+    if hero.is_stunned:
+        game.log(f"{hero.name} is stunned and can't lose {constants.HEART}. No penalty for allies in hand!")
+        return
     game.log(f"{hero.name} has {allies} allies in hand")
     for _ in range(allies):
         choices = ['h'] + [str(i) for i in range(len(hero._hand))]
@@ -493,9 +496,7 @@ class GameSevenVoldemort(Villain):
         super().__init__("Lord Voldemort", f"Add 1{constants.CONTROL}; each time {constants.CONTROL} is removed, ALL heroes lose 1{constants.HEART}",
                          "You win!", 20, effect=lambda game: game.locations.add_control(game),
                          on_reveal=lambda game: game.locations.add_control_callback(game, self),
-                         reward=lambda game: game.locations.remove_control_callback(game, self),
-                         on_stun=lambda game: game.locations.remove_control_callback(game, self),
-                         on_recover_from_stun=lambda game: game.locations.add_control_callback(game, self))
+                         reward=lambda game: game.locations.remove_control_callback(game, self))
 
     def control_callback(self, game, amount):
         if amount > -1:

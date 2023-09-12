@@ -515,7 +515,7 @@ def cho_effect(game):
 
 class LunaAlly(Ally):
     def __init__(self):
-        super().__init__("Luna Lovegood", f"Gain 1{constants.INFLUENCE}; if you play an item, gain 1{constants.DAMAGE}; roll the Ravenclaw die", 5, self.__effect)
+        super().__init__("Luna Lovegood", f"Gain 1{constants.INFLUENCE}; if you play an item, gain 1{constants.DAMAGE}; roll the Ravenclaw die", 5, self.__effect, rolls_house_die=True)
         self._used_ability = False
 
     def __effect(self, game):

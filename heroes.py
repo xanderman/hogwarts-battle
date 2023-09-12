@@ -49,14 +49,14 @@ class Heroes(object):
     def next_display_mode(self):
         self._display_mode = (self._display_mode + 1) % len(DISPLAY_MODES)
 
-    def display_state(self, resize=False, size=None):
+    def display_state(self, game, resize=False, size=None):
         if resize:
             self._window.resize(*size)
             self._window.clear()
             self._init_window()
         for i, hero in enumerate(self._heroes):
             attr = curses.A_BOLD | curses.color_pair(1) if i == self._current else curses.A_NORMAL
-            hero.display_state(DISPLAY_MODES[self._display_mode], self._pads[i], i, attr)
+            hero.display_state(game, DISPLAY_MODES[self._display_mode], self._pads[i], i, attr)
             first_line = self._pad_start_line + (i//2)*(self._pad_lines//2)
             first_col = self._pad_start_col + (i%2)*(self._pad_cols//2)
             last_line = first_line + self._pad_lines//self._hero_rows - 2
@@ -245,9 +245,21 @@ class Hero(object):
         self._extra_actions = {}
         self._proficiency.start_game(self)
 
-    def display_state(self, mode, window, i, attr):
+    def display_state(self, game, mode, window, i, attr):
         window.clear()
-        window.addstr(f"{i}: {self.name} ({self._hearts}{constants.HEART} {self._damage_tokens}{constants.DAMAGE} {self._influence_tokens}{constants.INFLUENCE}) -- Deck: {len(self._deck)}, Discard: {len(self._discard)}\n", attr)
+        window.addstr(f"{i}: {self.name}", attr)
+        window.addstr(f" ({self._hearts}{constants.HEART} {self._damage_tokens}{constants.DAMAGE}", attr)
+        window.addstr(f" {self._influence_tokens}{constants.INFLUENCE})", attr)
+        window.addstr(f" -- Deck: {len(self._deck)}, Discard: {len(self._discard)}", attr)
+        if not self.healing_allowed or not self.drawing_allowed or not self.gaining_tokens_allowed(game):
+            window.addstr(f", {constants.DISALLOW}", attr)
+            if not self.healing_allowed:
+                window.addstr(constants.HEART, attr)
+            if not self.drawing_allowed:
+                window.addstr(constants.CARD, attr)
+            if not self.gaining_tokens_allowed(game):
+                window.addstr(constants.DAMAGE + constants.INFLUENCE, attr)
+        window.addstr("\n")
         if mode == DisplayMode.DEFAULT:
             if self.ability_description is not None:
                 window.addstr(f"{self.ability_description}\n")
@@ -277,11 +289,12 @@ class Hero(object):
     def ability_description(self):
         return None
 
-    def is_stunned(self, game):
+    @property
+    def is_stunned(self):
         return self._hearts == 0
 
     def recover_from_stun(self, game):
-        if not self.is_stunned(game):
+        if not self.is_stunned:
             return
         game.log(f"{self.name} recovers from stun!")
         self._hearts = self._max_hearts
@@ -289,7 +302,7 @@ class Hero(object):
     def add_hearts(self, game, amount=1, source=None):
         if amount == 0:
             return
-        if self.is_stunned(game):
+        if self.is_stunned:
             game.log(f"{self.name} is stunned and cannot gain/lose hearts!")
             return
         if amount > 0 and self._hearts == self._max_hearts:
@@ -311,7 +324,7 @@ class Hero(object):
             self._hearts = self._max_hearts
         if self._hearts < 0:
             self._hearts = 0
-        if self.is_stunned(game):
+        if self.is_stunned:
             game.log(f"{self.name} has been stunned!")
             game.locations.add_control(game)
             self._damage_tokens = 0
@@ -343,7 +356,7 @@ class Hero(object):
 
     @property
     def healing_allowed(self):
-        return self._healing_allowed and not self._greyback_present and not self.is_stunned(None) and not self._hearts == self._max_hearts
+        return self._healing_allowed and not self._greyback_present and not self.is_stunned and not self._hearts == self._max_hearts
 
     def disallow_gaining_tokens_out_of_turn(self, game):
         self._gaining_out_of_turn_allowed = False
@@ -878,21 +891,19 @@ class Harry(Hero):
     def control_callback(self, game, amount):
         if amount > -1:
             return
+        if self._used_ability:
+            return
+        self._used_ability = True
         if self._game_num >= 7:
             self._game_seven_ability_control_callback(game, amount)
             return
         if self._game_num >= 3:
             self._game_three_ability_control_callback(game, amount)
-        self._used_ability = True
 
     def _game_three_ability_control_callback(self, game, amount):
-        if self._used_ability:
-            return
         game.heroes.choose_hero(game, prompt=f"{self.name}: first {constants.CONTROL} removed this turn, choose hero to gain 1{constants.DAMAGE}: ").add_damage(game, 1)
 
     def _game_seven_ability_control_callback(self, game, amount):
-        if self._used_ability:
-            return
         game.log(f"{self.name}: first {constants.CONTROL} removed this turn, two heroes gain 1{constants.DAMAGE}")
         game.heroes.choose_two_heroes(game, prompt=f"to gain 1{constants.DAMAGE}").add_damage(game, 1)
 
