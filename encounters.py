@@ -83,8 +83,10 @@ class Encounter(object):
         return f"{self.name}: {self.description}"
 
     def display_state(self, window):
-        window.addstr(f"{self.name}\n", curses.A_BOLD | curses.color_pair(1))
-        window.addstr(f"{self.description}\n")
+        window.addstr(f"{self.name}", curses.A_BOLD | curses.color_pair(1))
+        if self.completed:
+            window.addstr(f" ({constants.DISALLOW}!)", curses.A_BOLD | curses.color_pair(1))
+        window.addstr(f"\n{self.description}\n")
         window.addstr(f"To {self._complete_str}: ")
         self._display_to_complete(window)
         window.addstr(f"\nReward: {self.reward_str}\n")
@@ -154,6 +156,8 @@ class Diary(Horcrux):
         game.heroes.active_hero.add_extra_card_effect(game, self.__extra_effect)
 
     def __extra_effect(self, game, card):
+        if self.completed:
+            return
         if card.is_ally():
             game.log(f"{self.name}: Ally {card.name} played, {game.heroes.active_hero.name} loses 1{constants.HEART}")
             game.heroes.active_hero.remove_hearts(game)
@@ -198,6 +202,8 @@ class Ring(Horcrux):
         game.heroes.active_hero.add_extra_damage_effect(game, self.__extra_effect)
 
     def __extra_effect(self, game, villain, damage):
+        if self.completed:
+            return
         self._damaged_villains[villain] += damage
         if self._damaged_villains[villain] >= 2 and villain not in self._used_ability:
             self._used_ability.add(villain)
@@ -267,6 +273,7 @@ class Locket(Horcrux):
         else:
             raise ValueError(f"Programmer Error! Locket only applies to {constants.DAMAGE} or {constants.HEART}")
         if self._got_damage and self._got_heart:
+            game.heroes.all_heroes.allow_gaining_tokens_out_of_turn(game)
             self.completed = True
 
     def effect(self, game):
@@ -443,6 +450,7 @@ class Nagini(Horcrux):
         else:
             raise ValueError(f"Programmer Error! Nagini only applies to {constants.DAMAGE} or {constants.CARD} or {constants.HEART}")
         if self._got_damage and self._got_card and self._got_heart:
+            game.heroes.active_hero.allow_healing(game)
             self.completed = True
 
     def effect(self, game):

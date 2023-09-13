@@ -513,6 +513,10 @@ class Hero(object):
             # Get length first, so we don't play cards that get added to hand
             num_to_play = len(self._hand)
             for _ in range(num_to_play):
+                if len(self._hand) == 0:
+                    # This can happen in the rare instance that a hero gets
+                    # stunned while playing cards.
+                    break
                 self.play_card(game, 0)
         else:
             self.play_card(game, int(choice))

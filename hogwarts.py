@@ -477,6 +477,8 @@ class Owls(Item):
 def tonks_effect(game):
     if game.locations._control_remove_allowed:
         choice = game.input(f"Choose to (i) gain 3{constants.INFLUENCE}, (d) gain 2{constants.DAMAGE}, or (c) remove 1{constants.CONTROL}: ", "idc")
+    elif game.locations._current.control == 0:
+        choice = game.input(f"No {constants.CONTROL} to remove! Choose to (i) gain 3{constants.INFLUENCE}, (d) gain 2{constants.DAMAGE}: ", "id")
     else:
         choice = game.input(f"Removing {constants.CONTROL} not allowed! Choose to (i) gain 3{constants.INFLUENCE}, (d) gain 2{constants.DAMAGE}: ", "id")
 
