@@ -72,7 +72,7 @@ class VillainDeck(object):
             villain.took_damage = False
         voldemort_was_active = self.voldemort_active()
         while len(self.current) < self._max and len(self._deck) > 0:
-            death_eaters = sum(1 for v in game.villain_deck.current if v.name == "Death Eater")
+            death_eaters = sum(1 for v in game.villain_deck.current if v.name == "Death Eater" and not v._stunned)
             villain = self._deck.pop()
             self.current.append(villain)
             game.log(f"Revealed villain: {villain.name}")
@@ -91,7 +91,7 @@ class VillainDeck(object):
         return self._voldemort is not None and len(self._deck) == 0
 
     def voldemort_vulnerable(self, game):
-        return self.voldemort_active() and len(self.current) == 0 and (game.encounters is None or game.encounters.all_copmlete)
+        return self.voldemort_active() and len(self.current) == 0 and (game.encounters is None or game.encounters.all_complete)
 
     @property
     def choices(self):

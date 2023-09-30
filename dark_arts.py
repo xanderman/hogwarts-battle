@@ -206,7 +206,7 @@ game_three_cards = [
 ]
 
 def morsmordre_effect(game):
-    death_eaters = sum(1 for v in game.villain_deck.current if v.name == "Death Eater")
+    death_eaters = sum(1 for v in game.villain_deck.current if v.name == "Death Eater" and not v._stunned)
     if death_eaters > 0:
         game.log(f"Damage increased to {death_eaters+1}{constants.HEART} by Death Eater(s)")
     game.heroes.all_heroes.remove_hearts(game, 1 + death_eaters)

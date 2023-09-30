@@ -178,9 +178,19 @@ def dittany_effect(game):
         hero.add_hearts(game, 2)
         break
 
-def oliver_effect(game):
-    game.heroes.active_hero.add_damage(game)
-    game.heroes.active_hero.add_extra_villain_reward(game, lambda game: game.heroes.choose_hero(game, prompt=f"Oliver Wood: Villain defeated! Choose hero to gain 2{constants.HEART}: ").add_hearts(game, 2))
+class OlverWood(Ally):
+    def __init__(self):
+        super().__init__("Oliver Wood", f"Gain 1{constants.DAMAGE}, if you defeat a Villain one hero gains 2{constants.HEART}", 3, self.__effect)
+
+    def __effect(self, game):
+        game.heroes.active_hero.add_damage(game)
+        game.heroes.active_hero.add_extra_villain_reward(game, lambda game: game.heroes.choose_hero(game, prompt=f"Oliver Wood: Villain defeated! Choose hero to gain 2{constants.HEART}: ").add_hearts(game, 2))
+
+    def __extra_villain_reward(self, game):
+        if not game.heroes.healing_allowed:
+            game.log("Oliver Wood: Villain deafeted, but healing not allowed!")
+            return
+        game.heroes.choose_hero(game, prompt=f"Oliver Wood: Villain defeated! Choose hero to gain 2{constants.HEART}: ").add_hearts(game, 2)
 
 game_one_cards = [
     Spell("Wingardium Leviosa", f"Gain 1{constants.INFLUENCE}, may put acquired Items on top of deck", 2, wingardium_effect),
@@ -210,7 +220,7 @@ game_one_cards = [
     Item("Quidditch Gear", f"Gain 1{constants.DAMAGE} and 1{constants.HEART}", 3, lambda game: game.heroes.active_hero.add(game, damage=1, hearts=1)),
     Item("Sorting Hat", f"Gain 2{constants.INFLUENCE}, may put acquired Allies on top of deck", 4, sorting_hat_effect),
     Item("Golden Snitch", f"Gain 2{constants.INFLUENCE} and draw a card", 5, lambda game: game.heroes.active_hero.add(game, influence=2, cards=1)),
-    Ally("Oliver Wood", f"Gain 1{constants.DAMAGE}, if you defeat a Villain anyone gains 2{constants.HEART}", 3, oliver_effect),
+    OliverWood(),
     Ally("Rubeus Hagrid", f"Gain 1{constants.DAMAGE}; ALL heroes gain 1{constants.HEART}", 4, hagrid_effect),
     Ally("Albus Dumbledore", f"ALL heroes gain 1{constants.DAMAGE}, 1{constants.INFLUENCE}, 1{constants.HEART}, and draw a card", 8, lambda game: game.heroes.all_heroes.add(game, damage=1, influence=1, hearts=1, cards=1)),
 ]
@@ -302,6 +312,9 @@ def crystal_ball_effect(game):
 
 def lupin_effect(game):
     game.heroes.active_hero.add_damage(game)
+    if not game.heroes.healing_allowed:
+        game.log(f"Healing not allowed, ignoring Lupin's healing effect")
+        return
     game.heroes.choose_hero(game, prompt=f"Choose hero to gain 3{constants.HEART}: ").add_hearts(game, 3)
 
 def trelawny_effect(game):
@@ -475,9 +488,9 @@ class Owls(Item):
             self._used_ability = True
 
 def tonks_effect(game):
-    if game.locations._control_remove_allowed:
+    if game.locations.can_remove_control:
         choice = game.input(f"Choose to (i) gain 3{constants.INFLUENCE}, (d) gain 2{constants.DAMAGE}, or (c) remove 1{constants.CONTROL}: ", "idc")
-    elif game.locations._current.control == 0:
+    elif game.locations._current._control == 0:
         choice = game.input(f"No {constants.CONTROL} to remove! Choose to (i) gain 3{constants.INFLUENCE}, (d) gain 2{constants.DAMAGE}: ", "id")
     else:
         choice = game.input(f"Removing {constants.CONTROL} not allowed! Choose to (i) gain 3{constants.INFLUENCE}, (d) gain 2{constants.DAMAGE}: ", "id")

@@ -52,8 +52,10 @@ class EncountersDeck(object):
         return self._current
 
     @property
-    def all_copmlete(self):
-        return len(self._deck) == 0 and type(self._current) == NullEncounter
+    def all_complete(self):
+        if len(self._deck) > 0:
+            return False
+        return type(self._current == NullEncounter) or self._current.completed
 
     def play_turn(self, game):
         game.log(f"-----{self._title} phase-----")
@@ -450,7 +452,6 @@ class Nagini(Horcrux):
         else:
             raise ValueError(f"Programmer Error! Nagini only applies to {constants.DAMAGE} or {constants.CARD} or {constants.HEART}")
         if self._got_damage and self._got_card and self._got_heart:
-            game.heroes.active_hero.allow_healing(game)
             self.completed = True
 
     def effect(self, game):

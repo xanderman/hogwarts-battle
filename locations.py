@@ -53,6 +53,10 @@ class Locations(object):
     def remove_control_callback(self, game, callback):
         self._control_callbacks.remove(callback)
 
+    @property
+    def can_remove_control(self):
+        return self._control_remove_allowed and self.current._control > 0
+
     def allow_remove_control(self, game):
         self._control_remove_allowed = True
 
