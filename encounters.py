@@ -462,6 +462,9 @@ class Nagini(Horcrux):
         game.heroes.active_hero.add_action(game, 'N', "(N)agini", self.__reward_action)
 
     def __reward_action(self, game):
+        if not game.locations.can_remove_control:
+            game.log(f"{constants.CONTROL} cannot be removed! {self.name} not discarded")
+            return
         game.log(f"{self.name} discarded to remove 3{constants.CONTROL}")
         game.heroes.active_hero._encounters.remove(self)
         game.locations.remove_control(game, 3)

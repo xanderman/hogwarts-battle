@@ -617,7 +617,9 @@ class Hero(object):
                 self.buy_card(game)
                 continue
             if action == "e":
-                return
+                if self.confirm_end_turn(game):
+                    return
+                continue
             if action == "q":
                 raise QuitGame()
             if action in self._extra_actions:
@@ -625,7 +627,18 @@ class Hero(object):
                 continue
             raise ValueError("Programmer Error! Invalid choice!")
 
-    def end_turn(self, game):
+    def confirm_end_turn(self, game):
+        if (len(self._hand) > 0 and
+                game.input(f"{self.name} still has {len(self._hand)} cards in hand, end turn anyway? (y/n): ", "yn") != "y"):
+            return False
+        if (self._damage_tokens > 0 and
+                any(not v.took_damage for v in game.villain_deck.all_villains) and
+                game.input(f"{self.name} still has {self._damage_tokens}{constants.DAMAGE}, end turn anyway? (y/n): ", "yn") != "y"):
+            return False
+        if (self._influence_tokens > 0 and
+                any(c[0].cost <= self._influence_tokens for c in game.hogwarts_deck._market.values()) and
+                game.input(f"{self.name} still has {self._influence_tokens}{constants.INFLUENCE}, end turn anyway? (y/n): ", "yn") != "y"):
+            return False
         if self._cards_acquired == 0 and len(game.hogwarts_deck._market) >= 0:
             choices = ['a', 'c'] + [str(i) for i in range(len(game.hogwarts_deck._market))]
             choice = game.input(f"{self.name} didn't acquire any cards, choose market slot to empty, (a)ll, or (c)ancel: ", choices)
@@ -638,6 +651,9 @@ class Hero(object):
                 choice = game.hogwarts_deck[int(choice)]
                 game.log(f"Recycling {choice}")
                 game.hogwarts_deck.empty_market_slot(game, choice.name)
+        return True
+
+    def end_turn(self, game):
         self._discard += self._hand + self._play_area
         self._hand = []
         self._play_area = []

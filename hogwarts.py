@@ -178,7 +178,7 @@ def dittany_effect(game):
         hero.add_hearts(game, 2)
         break
 
-class OlverWood(Ally):
+class OliverWood(Ally):
     def __init__(self):
         super().__init__("Oliver Wood", f"Gain 1{constants.DAMAGE}, if you defeat a Villain one hero gains 2{constants.HEART}", 3, self.__effect)
 
