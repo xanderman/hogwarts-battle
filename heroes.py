@@ -590,6 +590,9 @@ class Hero(object):
     def add_action(self, game, key, description, action):
         self._extra_actions[key] = (description, action)
 
+    def remove_action(self, game, key):
+        del self._extra_actions[key]
+
     def play_turn(self, game):
         game.log(f"-----{self.name}'s turn-----")
         self._proficiency.start_turn(game)

@@ -247,6 +247,7 @@ class Ring(Horcrux):
         hero.discard(game, second, with_callbacks=False)
         game.locations.remove_control(game)
         self._used_ability = True
+        game.heroes.active_hero.remove_action(game, 'R')
 
 
 class Locket(Horcrux):
@@ -305,6 +306,7 @@ class Locket(Horcrux):
         hero.discard(game, int(choice), with_callbacks=False)
         game.roll_slytherin_die()
         self._used_ability = True
+        game.heroes.active_hero.remove_action(game, 'L')
 
 
 class Cup(Horcrux):
@@ -359,6 +361,7 @@ class Cup(Horcrux):
         hero.discard(game, int(choice), with_callbacks=False)
         game.roll_hufflepuff_die()
         self._used_ability = True
+        game.heroes.active_hero.remove_action(game, 'C')
 
 
 class Diadem(Horcrux):
@@ -417,6 +420,7 @@ class Diadem(Horcrux):
         hero.discard(game, int(choice), with_callbacks=False)
         game.roll_ravenclaw_die()
         self._used_ability = True
+        game.heroes.active_hero.remove_action(game, 'D')
 
 
 class Nagini(Horcrux):
@@ -467,6 +471,7 @@ class Nagini(Horcrux):
             return
         game.log(f"{self.name} discarded to remove 3{constants.CONTROL}")
         game.heroes.active_hero._encounters.remove(self)
+        game.heroes.active_hero.remove_action(game, 'N')
         game.locations.remove_control(game, 3)
 
 
