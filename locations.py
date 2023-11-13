@@ -8,7 +8,10 @@ class Locations(object):
         self._init_window()
         self._pad = curses.newpad(100, 100)
 
-        self._locations = LOCATIONS[game_num]
+        if isinstance(game_num, int):
+            self._locations = LOCATIONS[game_num]
+        elif game_num[0] == 'm':
+            self._locations = MONSTER_BOX_LOCATIONS[int(game_num[1])]
         self._current = 0
         self._control_callbacks = []
         self._control_remove_allowed = True
@@ -215,4 +218,59 @@ LOCATIONS = [
     game_five_locations,
     game_six_locations,
     game_seven_locations,
+]
+
+monster_box_one_locations = [
+    Location("Castle Gates", 1, 5),
+    Location("Hagrid's Hut", 2, 6),
+    Location("Great Hall", 3, 7),
+]
+
+monster_box_two_locations = [
+]
+
+monster_box_three_locations = [
+]
+
+monster_box_four_locations = [
+]
+
+MONSTER_BOX_LOCATIONS = [
+    -1,
+    monster_box_one_locations,
+    monster_box_two_locations,
+    monster_box_three_locations,
+    monster_box_four_locations,
+]
+
+potions_one_locations = [
+    Location("The Black Lake", 1, 5),
+    Location("The Hospital Wing", 2, 6), # TODO: 7 for 4-5 heroes
+    Location("The Hogwarts Library", 3, 7),
+]
+
+potions_two_locations = [
+    Location("Ministry of Magic Atrium", 1, 5), # TODO: 6 for 4-5 heroes
+    Location("Ministry Courtroom", 2, 6), # TODO: 7 for 4-5 heroes
+    Location("Ministry Lift", 3, 7),
+]
+
+potions_three_locations = [
+    Location("Malfoy Manor", 1, 5),
+    Location("Cave", 2, 5), # TODO: 6 for 4-5 heroes
+    Location("Atop the Tower", 3, 6), # TODO: 7 for 4-5 heroes
+]
+
+potions_four_locations = [
+    Location("Great Hall", 1, 6), # TODO: 7 for 4-5 heroes
+    Location("Forest Clearing", 2, 6), # TODO: 7 for 4-5 heroes
+    Location("Castle Courtyard", 3, 7), # TODO: 8 for 4-5 heroes
+]
+
+POTIONS_LOCATIONS = [
+    -1,
+    potions_one_locations,
+    potions_two_locations,
+    potions_three_locations,
+    potions_four_locations,
 ]

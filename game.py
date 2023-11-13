@@ -15,11 +15,15 @@ import locations
 import proficiencies
 import villains
 
+class DebugGame(Exception):
+    pass
+
+
 class Game(object):
     def __init__(self, window, game_num, chosen_heroes):
         self._window = window
         self._window.noutrefresh()
-        if game_num < 7:
+        if isinstance(game_num, int) and game_num < 7:
             locations_window = window.subwin(7, curses.COLS // 2, 0, 0)
             dark_arts_window = window.subwin(7, curses.COLS // 2, 0, curses.COLS // 2)
             self.encounters = None
@@ -33,7 +37,7 @@ class Game(object):
         self.dark_arts_deck = dark_arts.DarkArtsDeck(dark_arts_window, game_num)
 
         villains_window = window.subwin(15, curses.COLS // 2, 7, 0)
-        self.villain_deck = villains.VillainDeck(villains_window, game_num)
+        self.villain_deck = villains.VillainDeck(villains_window, game_num, self.encounters)
 
         hogwarts_window = window.subwin(15, curses.COLS // 2, 7, curses.COLS // 2)
         self.hogwarts_deck = hogwarts.HogwartsDeck(hogwarts_window, game_num)
@@ -105,6 +109,8 @@ class Game(object):
         while True:
             try:
                 key = self._window.getkey()
+                if key == "KEY_F(1)":
+                    raise DebugGame()
                 if key == "KEY_UP":
                     self.scroll_log_up()
                     continue
@@ -120,6 +126,7 @@ class Game(object):
                     continue
                 if key in valid_choices:
                     break
+
             except curses.error:
                 self.display_state(True)
         self._log_pad.addstr(key)
@@ -241,6 +248,19 @@ def main(stdscr, game_num, chosen_heroes):
         if game.locations.is_controlled(game) and not game.locations.advance(game):
             return False
 
+class GameNumAction(argparse.Action):
+    def __call__(self, parser, namespace, value, option_string=None):
+        try:
+            base_game_num = int(value)
+            if value < 1 or value > 7:
+                parser.error("Game number must be between 1 and 7")
+            setattr(namespace, self.dest, base_game_num)
+        except ValueError:
+            if value not in ["m1", "m2", "m3", "m4", "p1", "p2", "p3", "p4"]:
+                parser.error("Expansion games are from {m,p}[1-4]")
+            setattr(namespace, self.dest, value)
+
+
 class HeroArgAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         if len(values) > 4:
@@ -249,9 +269,9 @@ class HeroArgAction(argparse.Action):
         chosen_heroes = []
         for hero_name in values:
             parts = hero_name.split(":")
-            if game_num < 6 and len(parts) > 1:
+            if isinstance(game_num, int) and game_num < 6 and len(parts) > 1:
                 parser.error(f"Proficiencies cannot be used in game {game_num}")
-            if game_num >= 6 and len(parts) == 1:
+            elif len(parts) == 1:
                 parser.error(f"Proficiencies must be specified in game {game_num}")
             if len(parts) > 2:
                 parser.error(f"Heroes must be specified as 'NAME' or 'NAME:PROFICIENCY'")
@@ -272,8 +292,7 @@ class HeroArgAction(argparse.Action):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Play Harry Potter: Hogwarts Battle")
-    parser.add_argument("game_num", metavar="GAME", type=int, choices=range(1, 8),
-                        help="Game number to play, 1-7")
+    parser.add_argument("game_num", metavar="GAME", action=GameNumAction, help="Game number to play, 1-7")
     parser.add_argument("heroes", metavar="HERO", nargs="+", action=HeroArgAction,
                         help=f"""Hero to play, min 1, max 4. For games 6 and up, specify as NAME:PROFICIENCY.
                         Valid names are {', '.join(heroes.HEROES.keys())}. Valid
@@ -288,7 +307,11 @@ if __name__ == '__main__':
     print("Seed:", seed)
     random.seed(seed)
 
-    if curses.wrapper(main, args.game_num, args.heroes):
-        print("You won!")
-    else:
-        print("You lost!")
+    try:
+        if curses.wrapper(main, args.game_num, args.heroes):
+            print("You won!")
+        else:
+            print("You lost!")
+    except DebugGame:
+        import pdb
+        pdb.post_mortem()

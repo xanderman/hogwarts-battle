@@ -20,6 +20,14 @@ class DisplayMode(Enum):
 DISPLAY_MODES = [DisplayMode.DEFAULT, DisplayMode.HAND, DisplayMode.PLAY_AREA, DisplayMode.DISCARD]
 
 
+# TODO: if you have more than 50 cards to choose from, may God have mercy on your soul
+ALPHA_OPTIONS = ['a', 'b', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+                 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y',
+                 'z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
+                 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W',
+                 'X', 'Y', 'Z']
+
+
 class Heroes(object):
     def __init__(self, window, game_num, chosen_heroes):
         self._window = window
@@ -216,6 +224,9 @@ class Hero(object):
     def __init__(self, name, game_num, starting_deck, proficiency):
         self.name = name
         self._game_num = game_num
+        if not isinstance(game_num, int):
+            # TODO: this works, but is a hack. Need option for alternate abilities
+            self._game_num = 8
         self._max_hearts = 10
         self._hearts = 10
         self._deck = []
@@ -238,8 +249,11 @@ class Hero(object):
         self._can_put_items_in_deck = False
         self._can_put_spells_in_deck = False
         self._only_one_damage = False
+        self._only_draw_four_cards = False
         self._extra_villain_rewards = []
+        self._extra_creature_rewards = []
         self._extra_card_effects = []
+        self._extra_shuffle_effects = []
         self._extra_damage_effects = []
         self._encounters = []
         self._extra_actions = {}
@@ -380,6 +394,8 @@ class Hero(object):
                     # We've already shuffled the discard into the deck, so if the
                     # deck is empty now, we're out of cards
                     break
+                for effect in self._extra_shuffle_effects:
+                    effect(game, self)
                 self._deck = self._discard
                 self._discard = []
                 random.shuffle(self._deck)
@@ -387,6 +403,8 @@ class Hero(object):
 
     def reveal_top_card(self, game):
         if len(self._deck) == 0:
+            for effect in self._extra_shuffle_effects:
+                effect(game, self)
             self._deck = self._discard
             self._discard = []
             random.shuffle(self._deck)
@@ -423,6 +441,42 @@ class Hero(object):
             discarded.append(self.discard(game, choice, with_callbacks))
         return discarded
 
+    def choose_and_banish(self, game, desc="card", hand_only=False, optional=True, filter=lambda card: True):
+        choices = ['c'] if optional else []
+        choices += [str(i) for i in range(len(self._hand)) if filter(self._hand[i])]
+
+        if hand_only:
+            prompt = f"Choose {desc} for {self.name} to banish: "
+            if optional:
+                prompt = f"Choose {desc} for {self.name} to banish ('c' to cancel): "
+        else:
+            prompt = f"Choose {desc} for {self.name} to banish (0-9 for hand, a-Z for discard): "
+            if optional:
+                prompt = f"Choose {desc} for {self.name} to banish (0-9 for hand, a-Z for discard, 'c' to cancel): "
+            discard_choices = [i for i in range(len(self._discard)) if filter(self._discard[i])]
+            if len(discard_choices) > 0:
+                game.log(f"Cards in {self.name}'s discard:")
+                for i in discard_choices:
+                    key = ALPHA_OPTIONS[i]
+                    choices.append(key)
+                    game.log(f" {key}: {self._discard[i]}")
+
+        if len(choices) == 0 or (len(choices) == 1 and optional):
+            game.log(f"{self.name} has no valid cards to banish!")
+            return None
+
+        choice = game.input(prompt, choices)
+        if choice == "c":
+            return None
+        try:
+            choice = self._hand[int(choice)]
+            self._hand.remove(choice)
+        except ValueError:
+            choice = self._discard[ALPHA_OPTIONS.index(choice)]
+            self._discard.remove(choice)
+        game.log(f"{self.name} banishes {choice}")
+        return choice
+
     def add_acquire_callback(self, game, callback):
         self._acquire_callbacks.append(callback)
 
@@ -453,6 +507,14 @@ class Hero(object):
     def allow_only_one_damage(self, game):
         self._only_one_damage = True
 
+    @property
+    def only_draw_four_cards(self):
+        return self._only_draw_four_cards
+
+    @only_draw_four_cards.setter
+    def only_draw_four_cards(self, value):
+        self._only_draw_four_cards = value
+
     def _acquire(self, game, card, top_of_deck=False):
         self._cards_acquired += 1
         if top_of_deck:
@@ -469,11 +531,16 @@ class Hero(object):
         if len(game.hogwarts_deck._market) == 0:
             game.log("No cards to buy!")
             return
-        choices = ['c'] + [str(i) for i in range(len(game.hogwarts_deck._market))]
+        choices = ['c', 't'] + [str(i) for i in range(len(game.hogwarts_deck._market))]
         choice = game.input("Choose card to buy ('c' to cancel): ", choices)
         if choice == "c":
             return
-        choice = game.hogwarts_deck[int(choice)]
+        from_market = True
+        if choice == "t":
+            choice = hogwarts.Tergeo()
+            from_market = False
+        else:
+            choice = game.hogwarts_deck[int(choice)]
         game.log(f"Buying {choice.name} ({choice.cost}{constants.INFLUENCE}; {choice.description})")
         cost = choice.cost
         cost += self._proficiency.cost_modifier(game, choice)
@@ -481,7 +548,10 @@ class Hero(object):
             game.log(f"Not enough {constants.INFLUENCE}!")
             return
         self._influence_tokens -= cost
-        card = game.hogwarts_deck.remove(choice.name)
+        if from_market:
+            card = game.hogwarts_deck.remove(choice.name)
+        else:
+            card = choice
         top_of_deck = False
         if (card.is_ally() and self._can_put_allies_in_deck) or (card.is_item() and self._can_put_items_in_deck) or (card.is_spell() and self._can_put_spells_in_deck):
             if game.input(f"Put {card} on top of deck? (y/n): ", "yn") == "y":
@@ -490,6 +560,12 @@ class Hero(object):
 
     def add_extra_card_effect(self, game, effect):
         self._extra_card_effects.append(effect)
+
+    def add_extra_shuffle_effect(self, game, effect):
+        self._extra_shuffle_effects.append(effect)
+
+    def remove_extra_shuffle_effect(self, game, effect):
+        self._extra_shuffle_effects.remove(effect)
 
     def add_extra_damage_effect(self, game, effect):
         self._extra_damage_effects.append(effect)
@@ -547,15 +623,21 @@ class Hero(object):
             game.log("Voldemort is not vulnerable!")
             return None
         villain = game.villain_deck[choice]
-        if self._only_one_damage and villain.took_damage:
+        if self._only_one_damage and villain.is_villain and villain.took_damage:
             game.log(f"{villain.name} has already been assigned damage!")
             return None
         self.remove_damage(game)
-        if villain.add_damage(game):
+        defeated = villain.add_damage(game)
+        if defeated and villain.is_villain:
             for reward in self._extra_villain_rewards:
                 reward(game)
             # Extra rewards only apply once
             self._extra_villain_rewards = []
+        if defeated and villain.is_creature:
+            for reward in self._extra_creature_rewards:
+                reward(game)
+            # Extra rewards only apply once
+            self._extra_creature_rewards = []
         for effect in self._extra_damage_effects:
             effect(game, villain, 1)
         return villain
@@ -581,8 +663,18 @@ class Hero(object):
         # hearts last so that if we're stunned, it applies last
         self.add_hearts(game, hearts)
 
+    def add_detention(self, game, to_hand=False):
+        game.log(f"{self.name} gains detention!")
+        if to_hand:
+            self._hand.append(hogwarts.Detention())
+        else:
+            self._discard.append(hogwarts.Detention())
+
     def add_extra_villain_reward(self, game, reward):
         self._extra_villain_rewards.append(reward)
+
+    def add_extra_creature_reward(self, game, reward):
+        self._extra_creature_rewards.append(reward)
 
     def add_encounter(self, game, encounter):
         self._encounters.append(encounter)
@@ -635,7 +727,7 @@ class Hero(object):
                 game.input(f"{self.name} still has {len(self._hand)} cards in hand, end turn anyway? (y/n): ", "yn") != "y"):
             return False
         if (self._damage_tokens > 0 and
-                any(not v.took_damage for v in game.villain_deck.all_villains) and
+                any(not v.took_damage for v in game.villain_deck.all) and
                 game.input(f"{self.name} still has {self._damage_tokens}{constants.DAMAGE}, end turn anyway? (y/n): ", "yn") != "y"):
             return False
         if (self._influence_tokens > 0 and
@@ -670,10 +762,15 @@ class Hero(object):
         self._can_put_spells_in_deck = False
         self._only_one_damage = False
         self._extra_villain_rewards = []
+        self._extra_creature_rewards = []
         self._extra_card_effects = []
         self._extra_damage_effects = []
         self._extra_actions = {}
-        self.draw(game, 5, True)
+        if self._only_draw_four_cards and self._hearts <= 4:
+            self.draw(game, 4, True)
+        else:
+            self.draw(game, 5, True)
+        self._only_draw_four_cards = False
         self._proficiency.end_turn(game)
 
 

@@ -13,7 +13,11 @@ class HogwartsDeck(object):
         self._window = window
         self._init_window()
         self._pad = curses.newpad(100, 100)
-        self._deck = reduce(operator.add, CARDS[:game_num])
+        if isinstance(game_num, int):
+            self._deck = reduce(operator.add, CARDS[:game_num])
+        elif game_num[0] == 'm':
+            self._deck = reduce(operator.add, CARDS)
+            self._deck.extend(reduce(operator.add, MONSTER_BOX_CARDS[:int(game_num[1])]))
         self._max = 6
         random.shuffle(self._deck)
         self._market = defaultdict(list)
@@ -108,6 +112,10 @@ class HogwartsCard(object):
 
     def is_spell(self):
         return False
+
+    @property
+    def even_cost(self):
+        return self.cost != 0 and self.cost % 2 == 0
 
     @property
     def color(self):
@@ -264,11 +272,12 @@ def dobby_effect(game):
     game.heroes.active_hero.draw(game)
 
 def lockhart_effect(game):
-    if not game.heroes.active_hero.drawing_allowed:
-        game.log("Drawing not allowed, ignoring Lockhart effect")
+    hero = game.heroes.active_hero
+    if hero.drawing_allowed:
+        hero.draw(game)
+    elif game.input("Drawing not allowed, still discard? (y/n): ", "yn") == 'n':
         return
-    game.heroes.active_hero.draw(game)
-    game.heroes.active_hero.choose_and_discard(game, with_callbacks=False)
+    hero.choose_and_discard(game, with_callbacks=False)
 
 game_two_cards = [
     Spell("Finite", f"Remove 1{constants.CONTROL}", 3, lambda game: game.locations.remove_control(game)),
@@ -293,21 +302,21 @@ def patronum_effect(game):
 
 def petrificus_effect(game):
     game.heroes.active_hero.add_damage(game)
-    if len(game.villain_deck.choices) == 0:
+    choices = game.villain_deck.villain_choices
+    if len(choices) == 0:
         game.log("No villains to stun!")
         return
-    choices = ['c'] + game.villain_deck.choices
-    choice = game.input("Choose villain to stun ('c' to cancel): ", choices)
+    choice = game.input("Choose villain to stun ('c' to cancel): ", ['c'] + choices)
     if choice == 'c':
         return
     game.villain_deck[choice].stun(game)
 
 def crystal_ball_effect(game):
     hero = game.heroes.active_hero
-    if not hero.drawing_allowed:
-        game.log("Drawing not allowed, ignoring Crystal Ball effect")
+    if hero.drawing_allowed:
+        hero.draw(game, 2)
+    elif game.input("Drawing not allowed, still discard? (y/n): ", "yn") == 'n':
         return
-    hero.draw(game, 2)
     hero.choose_and_discard(game, with_callbacks=False)
 
 def lupin_effect(game):
@@ -319,10 +328,10 @@ def lupin_effect(game):
 
 def trelawny_effect(game):
     hero = game.heroes.active_hero
-    if not hero.drawing_allowed:
-        game.log("Drawing not allowed, ignoring Trelawny effect")
+    if hero.drawing_allowed:
+        hero.draw(game, 2)
+    elif game.input("Drawing not allowed, still discard? (y/n): ", "yn") == 'n':
         return
-    hero.draw(game, 2)
     discarded = hero.choose_and_discard(game, with_callbacks=False)[0]
     if discarded.is_spell():
         game.log(f"Discarded spell, gaining 2{constants.INFLUENCE}")
@@ -490,7 +499,7 @@ class Owls(Item):
 def tonks_effect(game):
     if game.locations.can_remove_control:
         choice = game.input(f"Choose to (i) gain 3{constants.INFLUENCE}, (d) gain 2{constants.DAMAGE}, or (c) remove 1{constants.CONTROL}: ", "idc")
-    elif game.locations._current._control == 0:
+    elif game.locations.current._control == 0:
         choice = game.input(f"No {constants.CONTROL} to remove! Choose to (i) gain 3{constants.INFLUENCE}, (d) gain 2{constants.DAMAGE}: ", "id")
     else:
         choice = game.input(f"Removing {constants.CONTROL} not allowed! Choose to (i) gain 3{constants.INFLUENCE}, (d) gain 2{constants.DAMAGE}: ", "id")
@@ -522,10 +531,10 @@ def weasley_twin_effect(bonus):
 def cho_effect(game):
     game.roll_ravenclaw_die()
     hero = game.heroes.active_hero
-    if not hero.drawing_allowed:
-        game.log("Drawing not allowed, ignoring Cho's draw effect")
+    if hero.drawing_allowed:
+        hero.draw(game, 3)
+    elif game.input("Drawing not allowed, still discard? (y/n): ", "yn") == 'n':
         return
-    hero.draw(game, 3)
     hero.choose_and_discard(game, 2, with_callbacks=False)
 
 class LunaAlly(Ally):
@@ -684,22 +693,6 @@ game_seven_cards = [
     Item("Sword of Gryffindor", f"Gain 2{constants.DAMAGE}; Roll the Gryffindor die twice", 7, sword_effect, rolls_house_die=True)
 ]
 
-monster_box_one_cards = [
-    Spell("Tergeo", f"Gain 1{constants.INFLUENCE}; you may banish a card in hand, if an Item, draw a card", 2),
-    Spell("Tergeo", f"Gain 1{constants.INFLUENCE}; you may banish a card in hand, if an Item, draw a card", 2),
-    Spell("Tergeo", f"Gain 1{constants.INFLUENCE}; you may banish a card in hand, if an Item, draw a card", 2),
-    Spell("Tergeo", f"Gain 1{constants.INFLUENCE}; you may banish a card in hand, if an Item, draw a card", 2),
-    Spell("Tergeo", f"Gain 1{constants.INFLUENCE}; you may banish a card in hand, if an Item, draw a card", 2),
-    Spell("Tergeo", f"Gain 1{constants.INFLUENCE}; you may banish a card in hand, if an Item, draw a card", 2),
-    Spell("Finite Incantatem", f"Remove 1{constants.CONTROL}; if in hand, reveal only 1 Dark Arts event", 6),
-    Spell("Finite Incantatem", f"Remove 1{constants.CONTROL}; if in hand, reveal only 1 Dark Arts event", 6),
-    Item("Old Sock", f"Gain 1{constants.INFLUENCE}; if another hero has an elf, gain 2{constants.DAMAGE}; if discarded, gain 2{constants.INFLUENCE}", 1),
-    Item("Old Sock", f"Gain 1{constants.INFLUENCE}; if another hero has an elf, gain 2{constants.DAMAGE}; if discarded, gain 2{constants.INFLUENCE}", 1),
-    Item("Harp", f"Gain 1{constants.DAMAGE}, stun one Creature", 6),
-    Ally("Fang", f"One hero gain 1{constants.INFLUENCE} and 2{constants.HEART}", 3, lambda game: game.heroes.choose_hero(game, prompt=f"Choose hero to gain 1{constants.INFLUENCE} and 2{constants.HEART}: ").add(game, influence=1, hearts=2)),
-    Ally("Argus Filch & Mrs Norris", "Draw two cards, then either discard or banish a card in hand", 4),
-]
-
 CARDS = [
     game_one_cards,
     game_two_cards,
@@ -708,5 +701,152 @@ CARDS = [
     game_five_cards,
     game_six_cards,
     game_seven_cards,
-    monster_box_one_cards,
 ]
+
+
+class Detention(Item):
+    def __init__(self):
+        super().__init__("Detention!", f"If you discard this, lose 2{constants.HEART}", 0, self.__effect, discard_effect=self.__discard_effect)
+
+    def __effect(self, game):
+        pass
+
+    def __discard_effect(self, game, hero):
+        hero.remove_hearts(game, 2)
+
+
+class Tergeo(Spell):
+    def __init__(self):
+        super().__init__(
+            "Tergeo",
+            f"Gain 1{constants.INFLUENCE}; you may banish a card in hand, if an Item, draw a card",
+            2, self.__effect)
+
+    def __effect(self, game):
+        hero = game.heroes.active_hero
+        hero.add_influence(game, 1)
+        if len(game.heroes.active_hero._hand) == 0:
+            game.log("No cards in hand, skipping banish effect")
+            return
+        banished = hero.choose_and_banish(game, hand_only=True)
+        if banished is not None and banished.is_item():
+            hero.draw(game)
+
+
+class FiniteIncantatem(Spell):
+    def __init__(self):
+        super().__init__(
+            "Finite Incantatem",
+            f"Remove 1{constants.CONTROL}; if in hand, reveal only 1 Dark Arts event",
+            6, self.__effect)
+
+    def __effect(self, game):
+        game.locations.remove_control(game)
+
+
+class OldSock(Item):
+    def __init__(self):
+        super().__init__(
+            "Old Sock",
+            f"Gain 1{constants.INFLUENCE}; if another hero has an elf, gain 2{constants.DAMAGE}; if discarded, gain 2{constants.INFLUENCE}",
+            1, self.__effect, discard_effect=self.__discard_effect)
+
+    def __effect(self, game):
+        game.heroes.active_hero.add_influence(game, 1)
+        for hero in game.heroes:
+            if hero == game.heroes.active_hero:
+                continue
+            for card in hero._discard:
+                if card.name == "Dobby":
+                    game.log(f"{hero.name} has Dobby, {self.name} adds 2{constants.DAMAGE}")
+                    game.heroes.active_hero.add_damage(game, 2)
+                    return
+
+    def __discard_effect(self, game, hero):
+        hero.add_influence(game, 2)
+
+
+class Harp(Item):
+    def __init__(self):
+        super().__init__(
+            "Harp",
+            f"Gain 1{constants.DAMAGE}; stun one Creature",
+            6, self.__effect)
+
+    def __effect(self, game):
+        game.heroes.active_hero.add_damage(game, 1)
+        choices = game.villain_deck.creature_choices
+        if len(choices) == 0:
+            game.log("No creatures to stun!")
+            return
+        choice = game.input("Choose villain to stun ('c' to cancel): ", ['c'] + choices)
+        if choice == 'c':
+            return
+        game.villain_deck[choice].stun(game)
+
+
+class Fang(Ally):
+    def __init__(self):
+        super().__init__(
+            "Fang",
+            f"One hero gains 1{constants.INFLUENCE} and 2{constants.HEART}",
+            3, self.__effect)
+
+    def __effect(self, game):
+        hero = game.heroes.choose_hero(game, prompt=f"Choose hero to gain 1{constants.INFLUENCE} and 2{constants.HEART}: ")
+        hero.add(game, influence=1, hearts=2)
+
+
+class Filch(Ally):
+    def __init__(self):
+        super().__init__(
+            "Argus Filch & Mrs Norris",
+            f"Draw two cards, then either discard or banish a card in hand",
+            4, self.__effect)
+
+    def __effect(self, game):
+        hero = game.heroes.active_hero
+        if hero.drawing_allowed:
+            hero.draw(game, 2)
+        elif game.input("Drawing not allowed, still discard/banish? (y/n): ", "yn") == 'n':
+            return
+        choice = game.input("Choose to (d)iscard or (b)anish a card: ", "db")
+        if choice == 'd':
+            game.heroes.active_hero.choose_and_discard(game)
+        elif choice == 'b':
+            game.heroes.active_hero.choose_and_banish(game, hand_only=True, optional=False)
+
+
+monster_box_one_cards = [
+    Tergeo(),
+    Tergeo(),
+    Tergeo(),
+    Tergeo(),
+    Tergeo(),
+    Tergeo(),
+    FiniteIncantatem(),
+    FiniteIncantatem(),
+    OldSock(),
+    OldSock(),
+    Harp(),
+    Fang(),
+    Filch(),
+]
+
+monster_box_two_cards = [
+]
+
+monster_box_three_cards = [
+]
+
+monster_box_four_cards = [
+]
+
+MONSTER_BOX_CARDS = [
+    monster_box_one_cards,
+    monster_box_two_cards,
+    monster_box_three_cards,
+    monster_box_four_cards,
+]
+
+# TODO: last encounter not clearing when completed, or displaying progress

@@ -265,6 +265,21 @@ class CareOfMagicalCreatures(Proficiency):
     def __init__(self):
         super().__init__("Care of Magical Creatures", f"The first time you assign {constants.DAMAGE}/{constants.INFLUENCE} to a Creature, one hero gains 2{constants.HEART}; if you defeat a Creature, remove 1{constants.CONTROL}")
 
+    def start_turn(self, game):
+        game.heroes.active_hero.add_extra_damage_effect(game, self._extra_damage_effect)
+        game.heroes.active_hero.add_extra_creature_reward(game, self._extra_creature_reward)
+        self._damaged_creatures = set()
+
+    def _extra_damage_effect(self, game, creature, amount):
+        if creature in self._damaged_creatures:
+            return
+        self._damaged_creatures.add(creature)
+        game.heroes.choose_hero(game, prompt=f"{self.name}: {game.heroes.active_hero.name} assigned {amount}{constants.DAMAGE} to {creature.name}. Choose hero to gain 2{constants.HEART}: ").add(game, hearts=2)
+
+    def _extra_creature_reward(self, game, creature):
+        game.log(f"{self.name}: {game.heroes.active_hero.name} defeated {creature.name}, removing 1{constants.CONTROL}")
+        game.locations.remove_control(game)
+
 
 PROFICIENCIES = {
     "None": NullProficiency,

@@ -12,7 +12,11 @@ class DarkArtsDeck(object):
         self._init_window()
         self._pad = curses.newpad(100, 100)
 
-        self._deck = reduce(operator.add, CARDS[:game_num])
+        if isinstance(game_num, int):
+            self._deck = reduce(operator.add, CARDS[:game_num])
+        elif game_num[0] == 'm':
+            self._deck = reduce(operator.add, CARDS)
+            self._deck.extend(reduce(operator.add, MONSTER_BOX_CARDS[:int(game_num[1])]))
         random.shuffle(self._deck)
         self._discard = []
         self._played = []
@@ -41,10 +45,18 @@ class DarkArtsDeck(object):
     def play_turn(self, game):
         game.log("-----Dark Arts phase-----")
         count = game.locations.current.dark_arts_count
+        self._only_one_card = any(card.name == "Finite Incantatem" for card in game.heroes.active_hero._hand)
         game.log(f"Playing {count} dark arts cards")
         self.play(game, count)
 
     def play(self, game, count):
+        if self._only_one_card:
+            if len(self._played) == 0:
+                game.log("Finite Incantatem: Only one dark arts card can be played!")
+                count = 1
+            else:
+                game.log("Finite Incantatem: No more dark arts cards can be played!")
+                return
         for i in range(count):
             card = self._draw()
             self._discard.append(card)
@@ -299,29 +311,6 @@ game_seven_cards = [
     DarkArtsCard("Crucio", f"Active hero loses 1{constants.HEART}; reveal another card", crucio_effect),
 ]
 
-def menacing_growl_effect(game):
-    pass
-
-def inquisitorial_squad_effect(game):
-    pass
-
-def raging_troll_effect(game):
-    pass
-
-def slugulus_eructo_effect(game):
-    pass
-
-monster_box_one_cards = [
-    DarkArtsCard("Menacing Growl", f"ALL heroes lose 1{constants.HEART} for each card in hand with cost of 3{constants.INFLUENCE}", menacing_growl_effect),
-    DarkArtsCard("Menacing Growl", f"ALL heroes lose 1{constants.HEART} for each card in hand with cost of 3{constants.INFLUENCE}", menacing_growl_effect),
-    DarkArtsCard("Inquisitorial Squad", f"Active hero adds Detention to hand; ALL heroes lose 1{constants.HEART} for each Detention in hand", inquisitorial_squad_effect),
-    DarkArtsCard("Inquisitorial Squad", f"Active hero adds Detention to hand; ALL heroes lose 1{constants.HEART} for each Detention in hand", inquisitorial_squad_effect),
-    DarkArtsCard("Raging Troll", f"Next hero loses 2{constants.HEART}; add 1{constants.CONTROL}", raging_troll_effect),
-    DarkArtsCard("Raging Troll", f"Next hero loses 2{constants.HEART}; add 1{constants.CONTROL}", raging_troll_effect),
-    DarkArtsCard("Slugulus Eructo", f"ALL heroes lose 1{constants.HEART} for each Creature", slugulus_eructo_effect),
-    DarkArtsCard("Blast-ended", f"Previous hero loses 1{constants.HEART} and discards a card", lambda game: game.heroes.previous_hero.add(game, hearts=-1, cards=-1)),
-]
-
 CARDS = [
     game_one_cards,
     game_two_cards,
@@ -330,5 +319,97 @@ CARDS = [
     game_five_cards,
     game_six_cards,
     game_seven_cards,
+]
+
+
+class MenacingGrowl(DarkArtsCard):
+    def __init__(self):
+        super().__init__(
+            "Menacing Growl",
+            f"ALL heroes lose 1{constants.HEART} for each card in hand with cost of 3{constants.INFLUENCE}", self.__effect)
+
+    def __effect(self, game):
+        game.heroes.all_heroes.effect(game, self.__per_hero)
+
+    def __per_hero(self, game, hero):
+        total = sum(1 for card in hero._hand if card.cost == 3)
+        game.log(f"Menacing Growl: {hero.name} has {total} cards with cost 3{constants.INFLUENCE}")
+        hero.remove_hearts(game, total)
+
+
+class IngquisitorialSquad(DarkArtsCard):
+    def __init__(self):
+        super().__init__(
+            "Inquisitorial Squad",
+            f"Active hero adds Detention to hand; ALL heroes lose 1{constants.HEART} for each Detention! in hand", self.__effect)
+
+    def __effect(self, game):
+        game.heroes.active_hero.add_detention(game, to_hand=True)
+        game.heroes.all_heroes.effect(game, self.__per_hero)
+
+    def __per_hero(self, game, hero):
+        total = sum(1 for card in hero._hand if card.name == "Detention!")
+        game.log(f"Inquisitorial Squad: {hero.name} has {total} Detention! cards")
+        hero.remove_hearts(game, total)
+
+
+class RagingTroll(DarkArtsCard):
+    def __init__(self):
+        super().__init__(
+            "Raging Troll",
+            f"Next hero loses 2{constants.HEART}; add 1{constants.CONTROL}", self.__effect)
+
+    def __effect(self, game):
+        game.heroes.next_hero.remove_hearts(game, 2)
+        game.locations.add_control(game)
+
+
+
+class SlugulusEructo(DarkArtsCard):
+    def __init__(self):
+        super().__init__(
+            "Slugulus Eructo",
+            f"ALL heroes lose 1{constants.HEART} for each Creature in play", self.__effect)
+
+    def __effect(self, game):
+        total = sum(1 for card in game.villain_deck.current if card.is_creature)
+        game.log(f"Slugulus Eructo: {total} Creatures in play")
+        game.heroes.all_heroes.remove_hearts(game, total)
+
+
+class BlastEnded(DarkArtsCard):
+    def __init__(self):
+        super().__init__(
+            "Blast-ended",
+            f"Previous hero loses 1{constants.HEART} and discards a card", self.__effect)
+
+    def __effect(self, game):
+        game.heroes.previous_hero.add(game, hearts=-1, cards=-1)
+
+
+monster_box_one_cards = [
+    MenacingGrowl(),
+    MenacingGrowl(),
+    IngquisitorialSquad(),
+    IngquisitorialSquad(),
+    RagingTroll(),
+    RagingTroll(),
+    SlugulusEructo(),
+    BlastEnded(),
+]
+
+monster_box_two_cards = [
+]
+
+monster_box_three_cards = [
+]
+
+monster_box_four_cards = [
+]
+
+MONSTER_BOX_CARDS = [
     monster_box_one_cards,
+    monster_box_two_cards,
+    monster_box_three_cards,
+    monster_box_four_cards,
 ]

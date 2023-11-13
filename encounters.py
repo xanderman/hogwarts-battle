@@ -1,6 +1,8 @@
 from collections import Counter
+from functools import reduce
 
 import curses
+import operator
 
 import constants
 import hogwarts
@@ -8,15 +10,12 @@ import hogwarts
 # In game 7 these are Horcurxes, but in the expansions the concept is generalized into Encounters.
 class EncountersDeck(object):
     def __init__(self, window, game_num):
-        if game_num < 7:
-            raise ValueError("Progammer Error! Encounters deck only exists in games 7+")
         self._game_num = game_num
         self._window = window
         self._init_window()
         self._pad = curses.newpad(100, 100)
 
-        # TODO: randomize encounters for "replay" game
-        self._deck = CARDS[game_num]
+        self._deck = build_deck(game_num)
         self._current = self._deck.pop(0)
 
     def _init_window(self):
@@ -43,6 +42,9 @@ class EncountersDeck(object):
         self.current.display_state(self._pad)
         self._pad.noutrefresh(0,0, self._pad_start_line,self._pad_start_col, self._pad_end_line,self._pad_end_col)
 
+    def required_villains(self):
+        return reduce(operator.add, [encounter.required_villains for encounter in self._deck])
+
     @property
     def _title(self):
         return "Horcruxes" if self._game_num == 7 else "Encounters"
@@ -55,7 +57,7 @@ class EncountersDeck(object):
     def all_complete(self):
         if len(self._deck) > 0:
             return False
-        return type(self._current == NullEncounter) or self._current.completed
+        return type(self._current) == NullEncounter or self._current.completed
 
     def play_turn(self, game):
         game.log(f"-----{self._title} phase-----")
@@ -65,9 +67,25 @@ class EncountersDeck(object):
     def check_completion(self, game):
         if not self._current.completed:
             return
-        self._current.on_complete(game)
         game.heroes.active_hero.add_encounter(game, self._current)
         self._current = self._deck.pop(0) if len(self._deck) > 0 else NullEncounter(self._game_num)
+        self._current.on_reveal(game)
+
+
+def build_deck(game_num):
+    if isinstance(game_num, int) and game_num < 7:
+        raise ValueError("Progammer Error! Encounters deck only exists in games 7+")
+    if game_num == 7:
+        deck = game_seven_horcruxes
+    elif game_num == "m1":
+        deck = monster_box_one_encounters
+    elif game_num == "m2":
+        deck = monster_box_two_encounters
+    elif game_num == "m3":
+        deck = monster_box_three_encounters
+    elif game_num == "m4":
+        deck = monster_box_four_encounters
+    return [encounter() for encounter in deck]
 
 
 class Encounter(object):
@@ -102,7 +120,7 @@ class Encounter(object):
     def apply_die_roll(self, game, result):
         raise ValueError(f"Programmer Error! Die roll should not apply to {self.name}")
 
-    def on_complete(self, game):
+    def on_reveal(self, game):
         pass
 
     def effect(self, game):
@@ -180,6 +198,7 @@ class Diary(Horcrux):
             hero = game.heroes.active_hero
             game.heroes.choose_hero(
                     game, prompt=f"{self.name}: {hero.name} played 2 allies, choose hero to gain 2{constants.HEART}: ").add_hearts(game, 2)
+
 
 class Ring(Horcrux):
     def __init__(self):
@@ -281,9 +300,6 @@ class Locket(Horcrux):
 
     def effect(self, game):
         game.heroes.all_heroes.disallow_gaining_tokens_out_of_turn(game)
-
-    def on_complete(self, game):
-        game.heroes.all_heroes.allow_gaining_tokens_out_of_turn(game)
 
     def reward_effect(self, game):
         self._used_ability = False
@@ -476,15 +492,190 @@ class Nagini(Horcrux):
 
 
 game_seven_horcruxes = [
-    Diary(),
-    Ring(),
-    Locket(),
-    Cup(),
-    Diadem(),
-    Nagini(),
+    Diary,
+    Ring,
+    Locket,
+    Cup,
+    Diadem,
+    Nagini,
 ]
 
-CARDS = [
-    -1, -1, -1, -1, -1, -1, -1,
-    game_seven_horcruxes,
+
+class PeskipiksiPesternomi(Encounter):
+    def __init__(self):
+        super().__init__(
+            "Peskipiksi Pesternomi",
+            f"If <= 4{constants.HEART}, only draw 4{constants.CARD} at end of turn",
+            f"Each time you play a {constants.CARD} with EVEN {constants.INFLUENCE} cost, one hero gains 1{constants.HEART}",
+            ["Cornish Pixies"])
+        self._played_cards = 0
+
+    def _display_to_complete(self, window):
+        window.addstr(f"Play 2{constants.CARD} with EVEN {constants.INFLUENCE} cost in one turn")
+        if self.completed:
+            window.addstr(" ✔", curses.A_BOLD | curses.color_pair(1))
+        else:
+            window.addstr(f" {self._played_cards}/2", curses.A_BOLD)
+
+    def effect(self, game):
+        self._played_cards = 0
+        game.heroes.active_hero.only_draw_four_cards = True
+        game.heroes.active_hero.add_extra_card_effect(game, self.__extra_effect)
+
+    def __extra_effect(self, game, card):
+        if self.completed:
+            return
+        if card.even_cost:
+            self._played_cards += 1
+        if self._played_cards >= 2:
+            self.completed = True
+            game.heroes.active_hero.only_draw_four_cards = False
+
+    def reward_effect(self, game):
+        game.heroes.active_hero.add_extra_card_effect(game, self.__reward_extra_effect)
+
+    def __reward_extra_effect(self, game, card):
+        if card.even_cost:
+            if not game.heroes.healing_allowed:
+                game.log(f"Healing not allowed, cannot use {self.name}")
+                return
+            hero = game.heroes.active_hero
+            game.heroes.choose_hero(
+                    game, prompt=f"{self.name}: {hero.name} played EVEN cost card, choose hero to gain 1{constants.HEART}: ").add_hearts(game, 1)
+
+
+class StudentsOutOfBed(Encounter):
+    def __init__(self):
+        super().__init__(
+            "Students Out of Bed",
+            f"Each time a Hero shuffles, add a Detention! first",
+            f"1/game: discard this; all heroes may banish a card in hand or discard",
+            ["Norbert", "Troll"])
+        self._got_heart = False
+        self._got_card = False
+
+    def _display_to_complete(self, window):
+        window.addstr(f"roll {constants.HEART}")
+        if self._got_heart:
+            window.addstr("✔", curses.A_BOLD | curses.color_pair(1))
+        window.addstr(f" and {constants.CARD}")
+        if self._got_card:
+            window.addstr("✔", curses.A_BOLD | curses.color_pair(1))
+
+    def die_roll_applies(self, game, result):
+        return ((result == constants.HEART and not self._got_heart) or
+                (result == constants.CARD and not self._got_card)) and not self.completed
+
+    def apply_die_roll(self, game, result):
+        if result == constants.HEART:
+            self._got_heart = True
+        elif result == constants.CARD:
+            self._got_card = True
+        else:
+            raise ValueError(f"Programmer Error! Students Out of Bed only applies to {constants.HEART} or {constants.CARD}")
+        if self._got_heart and self._got_card:
+            self.completed = True
+            game.heroes.all_heroes.remove_extra_shuffle_effect(game, self.__extra_effect)
+
+    def on_reveal(self, game):
+        game.heroes.all_heroes.add_extra_shuffle_effect(game, self.__extra_effect)
+
+    def effect(self, game):
+        pass
+
+    def __extra_effect(self, game, hero):
+        if self.completed:
+            return
+        game.log(f"{self.name}: {hero.name} shuffles, add a Detention! first")
+        hero.add_detention(game)
+
+    def reward_effect(self, game):
+        game.heroes.active_hero.add_action(game, 'S', "(S)tudents Out of Bed", self.__reward_action)
+
+    def __reward_action(self, game):
+        game.log(f"{self.name} discarded to banish a card in hand or discard")
+        game.heroes.active_hero._encounters.remove(self)
+        game.heroes.active_hero.remove_action(game, 'S')
+        game.heroes.all_heroes.choose_and_banish(game)
+
+
+class ThirdFloorCorridor(Encounter):
+    def __init__(self):
+        super().__init__(
+            "Third Floor Corridor",
+            "No rewards for Villains or Creatures",
+            "1/game: discard this; collect reward for top of Villain/Creature discard",
+            ["Fluffy"])
+        self._played_allies = 0
+        self._played_items = 0
+        self._played_spells = 0
+
+    def _display_to_complete(self, window):
+        window.addstr("Play 2 Allies")
+        if self._played_allies >= 2:
+            window.addstr(" ✔", curses.A_BOLD | curses.color_pair(1))
+        else:
+            window.addstr(f" ({self._played_allies}/2)", curses.A_BOLD)
+
+        window.addstr(", 2 Items")
+        if self._played_items >= 2:
+            window.addstr(" ✔", curses.A_BOLD | curses.color_pair(1))
+        else:
+            window.addstr(f" ({self._played_items}/2)", curses.A_BOLD)
+
+        window.addstr(", and 2 Spells")
+        if self._played_spells >= 2:
+            window.addstr(" ✔", curses.A_BOLD | curses.color_pair(1))
+        else:
+            window.addstr(f" ({self._played_spells}/2)", curses.A_BOLD)
+
+        window.addstr(" in one turn")
+        if self.completed:
+            window.addstr(" ✔", curses.A_BOLD | curses.color_pair(1))
+
+    def on_reveal(self, game):
+        game.villain_deck.disallow_rewards()
+
+    def effect(self, game):
+        self._played_allies = 0
+        self._played_items = 0
+        self._played_spells = 0
+        game.heroes.active_hero.add_extra_card_effect(game, self.__extra_effect)
+
+    def __extra_effect(self, game, card):
+        if self.completed:
+            return
+        if card.is_ally():
+            self._played_allies += 1
+        elif card.is_item():
+            self._played_items += 1
+        elif card.is_spell():
+            self._played_spells += 1
+        if self._played_allies >= 2 and self._played_items >= 2 and self._played_spells >= 2:
+            self.completed = True
+            game.villain_deck.allow_rewards()
+
+    def reward_effect(self, game):
+        game.heroes.active_hero.add_action(game, 'T', "(T)hird Floor Corridor", self.__reward_action)
+
+    def __reward_action(self, game):
+        game.log(f"{self.name} discarded to collect reward for top of Villain/Creature discard")
+        game.heroes.active_hero._encounters.remove(self)
+        game.heroes.active_hero.remove_action(game, 'T')
+        game.villain_deck.last_defeated_villain_reward(game)
+
+
+monster_box_one_encounters = [
+    PeskipiksiPesternomi,
+    StudentsOutOfBed,
+    ThirdFloorCorridor,
+]
+
+monster_box_two_encounters = [
+]
+
+monster_box_three_encounters = [
+]
+
+monster_box_four_encounters = [
 ]
