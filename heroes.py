@@ -623,8 +623,11 @@ class Hero(object):
             game.log("Voldemort is not vulnerable!")
             return None
         villain = game.villain_deck[choice]
+        if villain._hearts == 0 or villain._damage == villain._hearts:
+            game.log(f"{villain.name} cannot be assigned {constants.DAMAGE}!")
+            return None
         if self._only_one_damage and villain.is_villain and villain.took_damage:
-            game.log(f"{villain.name} has already been assigned damage!")
+            game.log(f"{villain.name} has already been assigned {constants.DAMAGE}!")
             return None
         self.remove_damage(game)
         defeated = villain.add_damage(game)
@@ -640,6 +643,44 @@ class Hero(object):
             self._extra_creature_rewards = []
         for effect in self._extra_damage_effects:
             effect(game, villain, 1)
+        return villain
+
+    def assign_influence(self, game):
+        if self._influence_tokens == 0:
+            game.log(f"No {constants.INFLUENCE} to assign!")
+            return
+        if len(game.villain_deck.choices) == 0:
+            game.log(f"No villains to assign {constants.INFLUENCE} to!")
+            return None
+        choices = ['c'] + game.villain_deck.choices
+        choice = game.input(f"Choose villain to assign {constants.INFLUENCE} to ('c' to cancel): ", choices)
+        if choice == 'c':
+            return None
+        if choice == 'v' and not game.villain_deck.voldemort_vulnerable(game):
+            game.log("Voldemort is not vulnerable!")
+            return None
+        villain = game.villain_deck[choice]
+        if villain._cost == 0 or villain._influence == villain._cost:
+            game.log(f"{villain.name} cannot be assigned {constants.INFLUENCE}!")
+            return None
+        if villain.took_influence:
+            game.log(f"{villain.name} has already been assigned {constants.INFLUENCE}!")
+            return None
+        self.remove_influence(game)
+        defeated = villain.add_influence(game)
+        if defeated and villain.is_villain:
+            for reward in self._extra_villain_rewards:
+                reward(game)
+            # Extra rewards only apply once
+            self._extra_villain_rewards = []
+        if defeated and villain.is_creature:
+            for reward in self._extra_creature_rewards:
+                reward(game)
+            # Extra rewards only apply once
+            self._extra_creature_rewards = []
+        # TODO there may need to be extra_influence_effects
+        # for effect in self._extra_damage_effects:
+        #     effect(game, villain, 1)
         return villain
 
     def add_influence(self, game, amount=1):
@@ -694,8 +735,8 @@ class Hero(object):
             self.add_action(game, *game.locations.current.action)
         while True:
             game.display_state()
-            actions = ["p", "a", "b", "e", "q"]
-            prompt = f"Select (p)lay card, (a)ssign {constants.DAMAGE}, (b)uy card"
+            actions = ["p", "a", "b", "e", "q", "i"]
+            prompt = f"Select (p)lay card, (a)ssign {constants.DAMAGE}, (i) assign {constants.INFLUENCE}, (b)uy card"
             for key, (description, _) in self._extra_actions.items():
                 actions.append(key)
                 prompt += f", {description}"
@@ -707,6 +748,9 @@ class Hero(object):
                 continue
             if action == "a":
                 self.assign_damage(game)
+                continue
+            if action == "i":
+                self.assign_influence(game)
                 continue
             if action == "b":
                 self.buy_card(game)
@@ -731,7 +775,8 @@ class Hero(object):
                 game.input(f"{self.name} still has {self._damage_tokens}{constants.DAMAGE}, end turn anyway? (y/n): ", "yn") != "y"):
             return False
         if (self._influence_tokens > 0 and
-                any(c[0].cost <= self._influence_tokens for c in game.hogwarts_deck._market.values()) and
+                (any(c[0].cost <= self._influence_tokens for c in game.hogwarts_deck._market.values())
+                    or any(not v.took_influence for v in game.villain_deck.all)) and
                 game.input(f"{self.name} still has {self._influence_tokens}{constants.INFLUENCE}, end turn anyway? (y/n): ", "yn") != "y"):
             return False
         if self._cards_acquired == 0 and len(game.hogwarts_deck._market) >= 0:

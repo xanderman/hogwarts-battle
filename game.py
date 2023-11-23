@@ -179,33 +179,34 @@ class Game(object):
         self.log("-----Turn end-----")
         self.heroes.next()
 
-    def roll_gryffindor_die(self, times=1):
+    def roll_gryffindor_die(self):
         faces = [constants.INFLUENCE, constants.INFLUENCE, constants.INFLUENCE, constants.HEART, constants.CARD, constants.DAMAGE]
-        for _ in range(times):
-            self.log("Rolling Gryffindor die")
-            self._roll_die(faces)
+        self.log("Rolling Gryffindor die")
+        self._roll_die(faces)
 
-    def roll_hufflepuff_die(self, times=1):
+    def roll_hufflepuff_die(self):
         faces = [constants.INFLUENCE, constants.HEART, constants.HEART, constants.HEART, constants.CARD, constants.DAMAGE]
-        for _ in range(times):
-            self.log("Rolling Hufflepuff die")
-            self._roll_die(faces)
+        self.log("Rolling Hufflepuff die")
+        self._roll_die(faces)
 
-    def roll_ravenclaw_die(self, times=1):
+    def roll_ravenclaw_die(self):
         faces = [constants.INFLUENCE, constants.HEART, constants.CARD, constants.CARD, constants.CARD, constants.DAMAGE]
-        for _ in range(times):
-            self.log("Rolling Ravenclaw die")
-            self._roll_die(faces)
+        self.log("Rolling Ravenclaw die")
+        self._roll_die(faces)
 
-    def roll_slytherin_die(self, times=1):
+    def roll_slytherin_die(self):
         faces = [constants.INFLUENCE, constants.HEART, constants.CARD, constants.DAMAGE, constants.DAMAGE, constants.DAMAGE]
-        for _ in range(times):
-            self.log("Rolling Slytherin die")
-            self._roll_die(faces)
+        self.log("Rolling Slytherin die")
+        self._roll_die(faces)
 
-    def _roll_die(self, options):
+    def roll_creature_die(self):
+        faces = [constants.HEART, constants.HEART + constants.HEART, constants.CARD, constants.CARD + constants.CARD, constants.DAMAGE, constants.CONTROL]
+        self.log("Rolling Creature die")
+        self._roll_die(faces, house_die=False)
+
+    def _roll_die(self, options, house_die=True):
         die_result = random.choice(options)
-        if self.heroes.active_hero._proficiency.can_reroll_house_dice and self.input(f"Rolled {die_result}, (a)ccept or (r)eroll?", "ar") == "r":
+        if house_die and self.heroes.active_hero._proficiency.can_reroll_house_dice and self.input(f"Rolled {die_result}, (a)ccept or (r)eroll?", "ar") == "r":
             die_result = random.choice(options)
         if (self.encounters is not None
             and self.encounters.current.die_roll_applies(self, die_result)
@@ -221,9 +222,18 @@ class Game(object):
         elif die_result == constants.HEART:
             self.log(f"Rolled {constants.HEART}, ALL heroes gain 1{constants.HEART}")
             self.heroes.all_heroes.add_hearts(self, 1)
+        elif die_result == constants.HEART + constants.HEART:
+            self.log(f"Rolled {constants.HEART}{constants.HEART}, ALL heroes gain 2{constants.HEART}")
+            self.heroes.all_heroes.add_hearts(self, 2)
         elif die_result == constants.CARD:
             self.log(f"Rolled {constants.CARD}, ALL heroes draw a card")
             self.heroes.all_heroes.draw(self)
+        elif die_result == constants.CARD + constants.CARD:
+            self.log(f"Rolled {constants.CARD}{constants.CARD}, ALL heroes draw 2 cards")
+            self.heroes.all_heroes.draw(self, 2)
+        elif die_result == constants.CONTROL:
+            self.log(f"Rolled {constants.CONTROL}, remove 1{constants.CONTROL}")
+            self.locations.remove_control(game)
 
 
 def main(stdscr, game_num, chosen_heroes):

@@ -14,7 +14,8 @@ class Locations(object):
             self._locations = MONSTER_BOX_LOCATIONS[int(game_num[1])]
         self._current = 0
         self._control_callbacks = []
-        self._control_remove_allowed = True
+        # simple ref counter of reasons why control cannot be removed
+        self._control_remove_allowed = 0
 
     def _init_window(self):
         self._window.box()
@@ -58,16 +59,16 @@ class Locations(object):
 
     @property
     def can_remove_control(self):
-        return self._control_remove_allowed and self.current._control > 0
+        return self._control_remove_allowed == 0 and self.current._control > 0
 
     def allow_remove_control(self, game):
-        self._control_remove_allowed = True
+        self._control_remove_allowed = max(0, self._control_remove_allowed - 1)
 
     def disallow_remove_control(self, game):
-        self._control_remove_allowed = False
+        self._control_remove_allowed += 1
 
     def add_control(self, game, amount=1):
-        if amount < 0 and not self._control_remove_allowed:
+        if amount < 0 and not self.can_remove_control:
             game.log(f"{constants.CONTROL} cannot be removed!")
             return
         self.current._add_control(game, amount, self._control_callbacks)
@@ -227,6 +228,9 @@ monster_box_one_locations = [
 ]
 
 monster_box_two_locations = [
+    Location("D.A.D.A. Classroom", 1, 6),
+    Location("Castle Hallways", 2, 6),
+    Location("Whomping Willow", 3, 7),
 ]
 
 monster_box_three_locations = [

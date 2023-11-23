@@ -364,7 +364,6 @@ class RagingTroll(DarkArtsCard):
         game.locations.add_control(game)
 
 
-
 class SlugulusEructo(DarkArtsCard):
     def __init__(self):
         super().__init__(
@@ -398,7 +397,67 @@ monster_box_one_cards = [
     BlastEnded(),
 ]
 
+
+class TheGrim(DarkArtsCard):
+    def __init__(self):
+        super().__init__(
+            "The Grim",
+            f"Active hero discards a card; add 1{constants.CONTROL}", self.__effect)
+
+    def __effect(self, game):
+        game.heroes.active_hero.choose_and_discard(game)
+        game.locations.add_control(game)
+
+
+class Transformed(DarkArtsCard):
+    def __init__(self):
+        super().__init__(
+            "Transformed",
+            "Active hero discards a card then adds Detention! to hand", self.__effect)
+
+    def __effect(self, game):
+        game.heroes.active_hero.choose_and_discard(game)
+        game.heroes.active_hero.add_detention(game, to_hand=True)
+
+
+class ViciousBite(DarkArtsCard):
+    def __init__(self):
+        super().__init__(
+            "Vicious Bite",
+            f"ALL heroes with least {constants.HEART} lose 2{constants.HEART}; if anyone is stunned, add an extra {constants.CONTROL}", self.__effect)
+
+    def __effect(self, game):
+        min_hearts = min(hero._hearts for hero in game.heroes.all_heroes)
+        any_stunned = False
+        for hero in game.heroes.all_heroes:
+            if hero._hearts == min_hearts:
+                was_stunned = hero.is_stunned
+                hero.remove_hearts(game, 2)
+                if not was_stunned and hero.is_stunned:
+                    any_stunned = True
+        if any_stunned:
+            game.log(f"Vicious Bite: Adding another {constants.CONTROL}")
+            game.locations.add_control(game)
+
+
+class Bombarda(DarkArtsCard):
+    def __init__(self):
+        super().__init__(
+            "Bombarda!",
+            f"ALL heroes add a Detention! to their discard", self.__effect)
+
+    def __effect(self, game):
+        game.heroes.all_heroes.add_detention(game)
+
+
 monster_box_two_cards = [
+    TheGrim(),
+    Transformed(),
+    Transformed(),
+    ViciousBite(),
+    ViciousBite(),
+    Bombarda(),
+    Bombarda(),
 ]
 
 monster_box_three_cards = [

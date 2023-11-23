@@ -833,7 +833,78 @@ monster_box_one_cards = [
     Filch(),
 ]
 
+class Buckbeak(Ally):
+    def __init__(self):
+        super().__init__(
+            "Buckbeak",
+            f"Draw 2 cards; discard one card. If you discard an Ally, gain 2{constants.DAMAGE}",
+            4, self.__effect)
+
+    def __effect(self, game):
+        hero = game.heroes.active_hero
+        if hero.drawing_allowed:
+            hero.draw(game, 2)
+        elif game.input("Drawing not allowed, still discard? (y/n): ", "yn") == 'n':
+            return
+        discarded = hero.choose_and_discard(game, with_callbacks=False)[0]
+        if discarded.is_ally():
+            game.log(f"Discarded ally, gaining 2{constants.DAMAGE}")
+            hero.add_damage(game, 2)
+
+
+class MonsterBook(Item):
+    def __init__(self):
+        super().__init__(
+            "Monster Book of Monsters",
+            f"Gain 1{constants.DAMAGE}; roll the Creature die",
+            5, self.__effect)
+
+    def __effect(self, game):
+        game.heroes.active_hero.add_damage(game, 1)
+        game.roll_creature_die()
+
+
+class Immobulus(Spell):
+    def __init__(self):
+        super().__init__(
+            "Immobulus",
+            f"Gain 1{constants.DAMAGE}; if you defeat a Creature, remove 1{constants.CONTROL}",
+            3, self.__effect)
+
+    def __effect(self, game):
+        game.heroes.active_hero.add_damage(game)
+        game.heroes.active_hero.add_extra_creature_reward(game, self.__reward)
+
+    def __reward(self, game):
+        game.log(f"Defeated creature, {self.name} removes 1{constants.CONTROL}")
+        game.locations.remove_control(game)
+
+
+class Depulso(Spell):
+    def __init__(self):
+        super().__init__(
+            "Depulso",
+            f"Gain 2{constants.INFLUENCE} or banish an Item in your hand or discard",
+            3, self.__effect)
+
+    def __effect(self, game):
+        choice = game.input(f"Choose effect: (i){constants.INFLUENCE}, (b)anish: ", "ib")
+        if choice == "i":
+            game.heroes.active_hero.add_influence(game, 2)
+        elif choice == "b":
+            game.heroes.active_hero.choose_and_banish(game, desc="item", filter=lambda card: card.is_item())
+
+
 monster_box_two_cards = [
+    Buckbeak(),
+    MonsterBook(),
+    MonsterBook(),
+    MonsterBook(),
+    Immobulus(),
+    Immobulus(),
+    Immobulus(),
+    Depulso(),
+    Depulso(),
 ]
 
 monster_box_three_cards = [
@@ -848,5 +919,3 @@ MONSTER_BOX_CARDS = [
     monster_box_three_cards,
     monster_box_four_cards,
 ]
-
-# TODO: last encounter not clearing when completed, or displaying progress
