@@ -779,7 +779,7 @@ class Harp(Item):
         if len(choices) == 0:
             game.log("No creatures to stun!")
             return
-        choice = game.input("Choose villain to stun ('c' to cancel): ", ['c'] + choices)
+        choice = game.input("Choose creature to stun ('c' to cancel): ", ['c'] + choices)
         if choice == 'c':
             return
         game.villain_deck[choice].stun(game)

@@ -233,7 +233,7 @@ class Game(object):
             self.heroes.all_heroes.draw(self, 2)
         elif die_result == constants.CONTROL:
             self.log(f"Rolled {constants.CONTROL}, remove 1{constants.CONTROL}")
-            self.locations.remove_control(game)
+            self.locations.remove_control(self)
 
 
 def main(stdscr, game_num, chosen_heroes):

@@ -108,9 +108,10 @@ class Location(object):
         if self._control < 0:
             self._control = 0
             game.log(f"{self.name} is empty of {constants.CONTROL}! Only {action} {abs(self._control - control_start)}{constants.CONTROL}")
+        control_added = self._control - control_start
         if self._control != control_start:
             for callback in callbacks:
-                callback.control_callback(game, self._control - control_start)
+                callback.control_callback(game, control_added)
 
     def _is_controlled(self):
         return self._control == self._control_max

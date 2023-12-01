@@ -742,6 +742,7 @@ class FullMoonRises(Encounter):
     def effect(self, game):
         self._foes_defeated = 0
         game.heroes.active_hero.add_extra_damage_effect(game, self.__extra_effect)
+        game.heroes.active_hero.add_extra_influence_effect(game, self.__extra_effect)
 
     def __extra_effect(self, game, foe, amount):
         if self.completed:

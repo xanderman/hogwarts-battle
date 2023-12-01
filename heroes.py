@@ -255,6 +255,7 @@ class Hero(object):
         self._extra_card_effects = []
         self._extra_shuffle_effects = []
         self._extra_damage_effects = []
+        self._extra_influence_effects = []
         self._encounters = []
         self._extra_actions = {}
         self._proficiency.start_game(self)
@@ -570,6 +571,9 @@ class Hero(object):
     def add_extra_damage_effect(self, game, effect):
         self._extra_damage_effects.append(effect)
 
+    def add_extra_influence_effect(self, game, effect):
+        self._extra_influence_effects.append(effect)
+
     def play_card(self, game, which):
         card = self._hand.pop(which)
         card.play(game)
@@ -678,9 +682,8 @@ class Hero(object):
                 reward(game)
             # Extra rewards only apply once
             self._extra_creature_rewards = []
-        # TODO there may need to be extra_influence_effects
-        # for effect in self._extra_damage_effects:
-        #     effect(game, villain, 1)
+        for effect in self._extra_influence_effects:
+            effect(game, villain, 1)
         return villain
 
     def add_influence(self, game, amount=1):
@@ -771,12 +774,12 @@ class Hero(object):
                 game.input(f"{self.name} still has {len(self._hand)} cards in hand, end turn anyway? (y/n): ", "yn") != "y"):
             return False
         if (self._damage_tokens > 0 and
-                any(not v.took_damage for v in game.villain_deck.all) and
+                any(self._villain_can_take_damage(v) for v in game.villain_deck.all) and
                 game.input(f"{self.name} still has {self._damage_tokens}{constants.DAMAGE}, end turn anyway? (y/n): ", "yn") != "y"):
             return False
         if (self._influence_tokens > 0 and
                 (any(c[0].cost <= self._influence_tokens for c in game.hogwarts_deck._market.values())
-                    or any(not v.took_influence for v in game.villain_deck.all)) and
+                    or any(self._villain_can_take_influence(v) for v in game.villain_deck.all)) and
                 game.input(f"{self.name} still has {self._influence_tokens}{constants.INFLUENCE}, end turn anyway? (y/n): ", "yn") != "y"):
             return False
         if self._cards_acquired == 0 and len(game.hogwarts_deck._market) >= 0:
@@ -791,6 +794,20 @@ class Hero(object):
                 choice = game.hogwarts_deck[int(choice)]
                 game.log(f"Recycling {choice}")
                 game.hogwarts_deck.empty_market_slot(game, choice.name)
+        return True
+
+    def _villain_can_take_damage(self, villain):
+        if villain._hearts == 0 or villain._damage == villain._hearts:
+            return False
+        if self._only_one_damage and villain.is_villain and villain.took_damage:
+            return False
+        return True
+
+    def _villain_can_take_influence(self, villain):
+        if villain._cost == 0 or villain._influence == villain._cost:
+            return False
+        if villain.took_influence:
+            return False
         return True
 
     def end_turn(self, game):
@@ -810,6 +827,7 @@ class Hero(object):
         self._extra_creature_rewards = []
         self._extra_card_effects = []
         self._extra_damage_effects = []
+        self._extra_influence_effects = []
         self._extra_actions = {}
         if self._only_draw_four_cards and self._hearts <= 4:
             self.draw(game, 4, True)
