@@ -148,14 +148,6 @@ class Heroes(object):
         for hero in self._heroes:
             hero.allow_drawing(game)
 
-    def basilisk_revealed(self, game):
-        for hero in self._heroes:
-            hero._basilisk_present = True
-
-    def basilisk_defeated(self, game):
-        for hero in self._heroes:
-            hero._basilisk_present = False
-
     @property
     def drawing_allowed(self):
         return any(hero.drawing_allowed for hero in self._heroes)
@@ -167,14 +159,6 @@ class Heroes(object):
     def allow_healing(self, game):
         for hero in self._heroes:
             hero.allow_healing(game)
-
-    def greyback_revealed(self, game):
-        for hero in self._heroes:
-            hero._greyback_present = True
-
-    def greyback_defeated(self, game):
-        for hero in self._heroes:
-            hero._greyback_present = False
 
     @property
     def healing_allowed(self):
@@ -240,15 +224,14 @@ class Hero(object):
         self._acquire_callbacks = []
         self._discard_callbacks = []
         self._hearts_callbacks = []
-        self._drawing_allowed = True
-        self._healing_allowed = True
+        # Ref counters of reasons why drawing/healing is disallowed
+        self._drawing_disallowed = 0
+        self._healing_disallowed = 0
         self._gaining_out_of_turn_allowed = True
-        self._basilisk_present = False
-        self._greyback_present = False
         self._can_put_allies_in_deck = False
         self._can_put_items_in_deck = False
         self._can_put_spells_in_deck = False
-        self._only_one_damage = False
+        self._only_one_damage_per_villain = False
         self._only_draw_four_cards = False
         self._extra_villain_rewards = []
         self._extra_creature_rewards = []
@@ -354,24 +337,24 @@ class Hero(object):
         self.add_hearts(game, -amount)
 
     def disallow_drawing(self, game):
-        self._drawing_allowed = False
+        self._drawing_disallowed += 1
 
     def allow_drawing(self, game):
-        self._drawing_allowed = True
+        self._drawing_disallowed = max(0, self._drawing_disallowed - 1)
 
     @property
     def drawing_allowed(self):
-        return self._drawing_allowed and not self._basilisk_present
+        return self._drawing_disallowed == 0
 
     def disallow_healing(self, game):
-        self._healing_allowed = False
+        self._healing_disallowed += 1
 
     def allow_healing(self, game):
-        self._healing_allowed = True
+        self._healing_disallowed = max(0, self._healing_disallowed - 1)
 
     @property
     def healing_allowed(self):
-        return self._healing_allowed and not self._greyback_present and not self.is_stunned and not self._hearts == self._max_hearts
+        return self._healing_disallowed == 0 and not self.is_stunned and not self._hearts == self._max_hearts
 
     def disallow_gaining_tokens_out_of_turn(self, game):
         self._gaining_out_of_turn_allowed = False
@@ -505,8 +488,8 @@ class Hero(object):
     def can_put_spells_in_deck(self, game):
         self._can_put_spells_in_deck = True
 
-    def allow_only_one_damage(self, game):
-        self._only_one_damage = True
+    def allow_only_one_damage_per_villain(self, game):
+        self._only_one_damage_per_villain = True
 
     @property
     def only_draw_four_cards(self):
@@ -532,13 +515,16 @@ class Hero(object):
         if len(game.hogwarts_deck._market) == 0:
             game.log("No cards to buy!")
             return
-        choices = ['c', 't'] + [str(i) for i in range(len(game.hogwarts_deck._market))]
+        choices = ['c', 't', 'r'] + [str(i) for i in range(len(game.hogwarts_deck._market))]
         choice = game.input("Choose card to buy ('c' to cancel): ", choices)
         if choice == "c":
             return
         from_market = True
         if choice == "t":
             choice = hogwarts.Tergeo()
+            from_market = False
+        elif choice == "r":
+            choice = hogwarts.Reparo()
             from_market = False
         else:
             choice = game.hogwarts_deck[int(choice)]
@@ -630,7 +616,7 @@ class Hero(object):
         if villain._hearts == 0 or villain._damage == villain._hearts:
             game.log(f"{villain.name} cannot be assigned {constants.DAMAGE}!")
             return None
-        if self._only_one_damage and villain.is_villain and villain.took_damage:
+        if self._only_one_damage_per_villain and villain.is_villain and villain.took_damage:
             game.log(f"{villain.name} has already been assigned {constants.DAMAGE}!")
             return None
         self.remove_damage(game)
@@ -799,7 +785,7 @@ class Hero(object):
     def _villain_can_take_damage(self, villain):
         if villain._hearts == 0 or villain._damage == villain._hearts:
             return False
-        if self._only_one_damage and villain.is_villain and villain.took_damage:
+        if self._only_one_damage_per_villain and villain.is_villain and villain.took_damage:
             return False
         return True
 
@@ -817,12 +803,10 @@ class Hero(object):
         self._damage_tokens = 0
         self._influence_tokens = 0
         self._cards_acquired = 0
-        game.heroes.allow_drawing(game)
-        game.heroes.allow_healing(game)
         self._can_put_allies_in_deck = False
         self._can_put_items_in_deck = False
         self._can_put_spells_in_deck = False
-        self._only_one_damage = False
+        self._only_one_damage_per_villain = False
         self._extra_villain_rewards = []
         self._extra_creature_rewards = []
         self._extra_card_effects = []
@@ -837,118 +821,189 @@ class Hero(object):
         self._proficiency.end_turn(game)
 
 
-def base_ally_effect(game):
-    hero = game.heroes.active_hero
-    if hero._hearts == hero._max_hearts:
-        game.log(f"{hero.name} is already at max hearts, gaining 1{constants.DAMAGE}")
-        hero.add_damage(game, 1)
-        return
-    if not hero.healing_allowed:
-        game.log(f"{hero.name} can't heal, gaining 1{constants.DAMAGE}")
-        hero.add_damage(game, 1)
-        return
-    choice = game.input(f"Choose effect: (d){constants.DAMAGE}, (h){constants.HEART}: ", "dh")
-    if choice == "d":
-        hero.add_damage(game, 1)
-    elif choice == "h":
-        hero.add_hearts(game, 2)
+class Alohomora(hogwarts.Spell):
+    def __init__(self):
+        super().__init__("Alohomora", f"Gain 1{constants.INFLUENCE}", 0)
 
-def beedle_effect(game):
-    if len(game.heroes) == 1:
-        game.log(f"Only one hero, gaining 2{constants.INFLUENCE}")
-        choice = "y"
-    else:
-        choice = game.input(f"Choose effect: (y)ou get 2{constants.INFLUENCE}, (a)ll get 1{constants.INFLUENCE}: ", "ya")
+    def _effect(self, game):
+        game.heroes.active_hero.add_influence(game)
 
-    if choice == "y":
-        game.heroes.active_hero.add_influence(game, 2)
-    elif choice == "a":
-        game.heroes.all_heroes.add_influence(game, 1)
 
-def time_turner_effect(game):
-    game.heroes.active_hero.add_influence(game)
-    game.heroes.active_hero.can_put_spells_in_deck(game)
+class StarterAlly(hogwarts.Ally):
+    def __init__(self, name):
+        super().__init__(name, f"Gain 1{constants.DAMAGE} or 2{constants.HEART}", 0)
 
-def broom_effect(game):
-    game.heroes.active_hero.add_damage(game)
-    game.heroes.active_hero.add_extra_villain_reward(game, lambda game: game.heroes.active_hero.add_influence(game))
+    def _effect(self, game):
+        hero = game.heroes.active_hero
+        if hero._hearts == hero._max_hearts:
+            game.log(f"{hero.name} is already at max hearts, gaining 1{constants.DAMAGE}")
+            hero.add_damage(game, 1)
+            return
+        if not hero.healing_allowed:
+            game.log(f"{hero.name} can't heal, gaining 1{constants.DAMAGE}")
+            hero.add_damage(game, 1)
+            return
+        choice = game.input(f"Choose effect: (d){constants.DAMAGE}, (h){constants.HEART}: ", "dh")
+        if choice == "d":
+            hero.add_damage(game, 1)
+        elif choice == "h":
+            hero.add_hearts(game, 2)
 
-def add_damage_if_ally(game, card):
-    if card.is_ally():
-        game.log(f"Ally {card.name} played, beans add damage")
-        game.heroes.active_hero.add_damage(game)
 
-def beans_effect(game):
-    game.heroes.active_hero.add_influence(game)
-    for card in game.heroes.active_hero._play_area:
+class TimeTurner(hogwarts.Item):
+    def __init__(self):
+        super().__init__("Time-Turner", f"Gain 1{constants.INFLUENCE}, may put acquired Spells on top of deck", 0)
+
+    def _effect(self, game):
+        game.heroes.active_hero.add_influence(game)
+        game.heroes.active_hero.can_put_spells_in_deck(game)
+
+
+class TalesOfBeedleTheBard(hogwarts.Item):
+    def __init__(self):
+        super().__init__("The Tales of Beedle the Bard", f"Gain 2{constants.INFLUENCE}, or ALL heroes gain 1{constants.INFLUENCE}", 0)
+
+    def _effect(self, game):
+        if len(game.heroes) == 1:
+            game.log(f"Only one hero, gaining 2{constants.INFLUENCE}")
+            choice = "y"
+        else:
+            choice = game.input(f"Choose effect: (y)ou get 2{constants.INFLUENCE}, (a)ll get 1{constants.INFLUENCE}: ", "ya")
+
+        if choice == "y":
+            game.heroes.active_hero.add_influence(game, 2)
+        elif choice == "a":
+            game.heroes.all_heroes.add_influence(game, 1)
+
+
+class EveryFlavourBeans(hogwarts.Item):
+    def __init__(self):
+        super().__init__("Every Flavour Beans", f"Gain 1{constants.INFLUENCE}; for each Ally played, gain 1{constants.DAMAGE}", 0)
+
+    def _effect(self, game):
+        game.heroes.active_hero.add_influence(game)
+        for card in game.heroes.active_hero._play_area:
+            if card.is_ally():
+                game.log(f"Ally {card.name} already played, beans add damage")
+                game.heroes.active_hero.add_damage(game)
+        game.heroes.active_hero.add_extra_card_effect(game, self.__add_damage_if_ally)
+
+    def __add_damage_if_ally(self, game, card):
         if card.is_ally():
-            game.log(f"Ally {card.name} already played, beans add damage")
+            game.log(f"Ally {card.name} played, beans add damage")
             game.heroes.active_hero.add_damage(game)
-    game.heroes.active_hero.add_extra_card_effect(game, add_damage_if_ally)
 
-def mandrake_effect(game):
-    if not game.heroes.healing_allowed:
-        game.log(f"Nobody can heal, gaining 1{constants.DAMAGE}")
-        game.heroes.active_hero.add_damage(game, 1)
-        return
-    choices = ['d'] + [str(i) for i in range(len(game.heroes))]
-    while True:
-        choice = game.input(f"Choose hero to gain 2{constants.HEART} or (d){constants.DAMAGE}: ", choices)
+
+class StarterBroom(hogwarts.Item):
+    def __init__(self, name):
+        super().__init__(name, f"Gain 1{constants.DAMAGE}; if you defeat a Villain, gain 1{constants.INFLUENCE}", 0)
+
+    def _effect(self, game):
+        game.heroes.active_hero.add_damage(game)
+        game.heroes.active_hero.add_extra_villain_reward(game, lambda game: game.heroes.active_hero.add_influence(game))
+
+
+class InvisibilityCloak(hogwarts.Item):
+    def __init__(self):
+        super().__init__("Invisibility cloak", f"Gain 1{constants.INFLUENCE}; if in hand, take only 1{constants.DAMAGE} from each Villain or Dark Arts", 0)
+
+    def _effect(self, game):
+        game.heroes.active_hero.add_influence(game)
+
+
+class Remembrall(hogwarts.Item):
+    def __init__(self):
+        super().__init__("Remembrall", f"Gain 1{constants.INFLUENCE}; if discarded, gain 2{constants.INFLUENCE}", 0)
+
+    def _effect(self, game):
+        game.heroes.active_hero.add_influence(game)
+
+    def discard_effect(self, game, hero):
+        hero.add_influence(game, 2)
+
+
+class Mandrake(hogwarts.Item):
+    def __init__(self):
+        super().__init__("Mandrake", f"Gain 1{constants.DAMAGE}, or one hero gains 2{constants.HEART}", 0)
+
+    def _effect(self, game):
+        if not game.heroes.healing_allowed:
+            game.log(f"Nobody can heal, gaining 1{constants.DAMAGE}")
+            game.heroes.active_hero.add_damage(game, 1)
+            return
+        choices = ['d'] + [str(i) for i in range(len(game.heroes))]
+        while True:
+            choice = game.input(f"Choose hero to gain 2{constants.HEART} or (d){constants.DAMAGE}: ", choices)
+            if choice == "d":
+                game.heroes.active_hero.add_damage(game)
+                break
+            hero = game.heroes[int(choice)]
+            if not hero.healing_allowed:
+                game.log(f"{hero.name} can't heal, choose another hero!")
+                continue
+            game.heroes[int(choice)].add_hearts(game, 2)
+            break
+
+
+class BatBogeyHex(hogwarts.Item):
+    def __init__(self):
+        super().__init__("Bat Bogey Hex", f"Gain 1{constants.DAMAGE}, or ALL heroes gain 1{constants.HEART}", 0)
+
+    def _effect(self, game):
+        if not game.heroes.healing_allowed:
+            game.log(f"Nobody can heal, gaining 1{constants.DAMAGE}")
+            game.heroes.active_hero.add_damage(game, 1)
+            return
+        choice =  game.input(f"Choose effect: (d){constants.DAMAGE}, (h) ALL heroes get 1{constants.HEART}: ", "dh")
         if choice == "d":
             game.heroes.active_hero.add_damage(game)
-            break
-        hero = game.heroes[int(choice)]
-        if not hero.healing_allowed:
-            game.log(f"{hero.name} can't heal, choose another hero!")
-            continue
-        game.heroes[int(choice)].add_hearts(game, 2)
-        break
+        elif choice == "h":
+            game.heroes.all_heroes.add_hearts(game, 1)
 
-def bat_bogey_effect(game):
-    if not game.heroes.healing_allowed:
-        game.log(f"Nobody can heal, gaining 1{constants.DAMAGE}")
-        game.heroes.active_hero.add_damage(game, 1)
-        return
-    choice =  game.input(f"Choose effect: (d){constants.DAMAGE}, (h) ALL heroes get 1{constants.HEART}: ", "dh")
-    if choice == "d":
-        game.heroes.active_hero.add_damage(game)
-    elif choice == "h":
-        game.heroes.all_heroes.add_hearts(game, 1)
 
-def spectrespecs_effect(game):
-    game.heroes.active_hero.add_influence(game)
-    if game.input("Reveal top Dark Arts event? (y/n): ", "yn") == "y":
-        card = game.dark_arts_deck.reveal()
-        game.log(f"Revealed {card.name}: {card.description}")
-        if game.input("Discard? (y/n): ", "yn") == "y":
-            game.dark_arts_deck.discard()
+class Spectrespecs(hogwarts.Item):
+    def __init__(self):
+        super().__init__("Spectrespecs", f"Gain 1{constants.INFLUENCE}; you may reveal the top Dark Arts and choose to discard it", 0)
 
-broom_cards = ["Quidditch Gear", "Cleansweep 11", "Firebolt", "Nimbus 2000", "Nimbus 2001"]
-def lion_hat_effect(game):
-    game.heroes.active_hero.add_influence(game)
-    for hero in game.heroes:
-        if hero == game.heroes.active_hero:
-            continue
-        for card in hero._hand:
-            if card.name in broom_cards:
-                game.log(f"{hero.name} has {card.name}, {game.heroes.active_hero.name} gains 1{constants.DAMAGE}")
-                game.heroes.active_hero.add_damage(game)
-                return
+    def _effect(self, game):
+        game.heroes.active_hero.add_influence(game)
+        if game.input("Reveal top Dark Arts event? (y/n): ", "yn") == "y":
+            card = game.dark_arts_deck.reveal()
+            game.log(f"Revealed {card.name}: {card.description}")
+            if game.input("Discard? (y/n): ", "yn") == "y":
+                game.dark_arts_deck.discard()
+
+
+class LionHat(hogwarts.Item):
+    def __init__(self):
+        super().__init__("Lion Hat", f"Gain 1{constants.INFLUENCE}; if another hero has broom or quidditch gear, gain 1{constants.DAMAGE}", 0)
+
+    def _effect(self, game):
+        broom_cards = ["Quidditch Gear", "Cleansweep 11", "Firebolt", "Nimbus 2000", "Nimbus 2001"]
+        game.heroes.active_hero.add_influence(game)
+        for hero in game.heroes:
+            if hero == game.heroes.active_hero:
+                continue
+            for card in hero._hand:
+                if card.name in broom_cards:
+                    game.log(f"{hero.name} has {card.name}, {game.heroes.active_hero.name} gains 1{constants.DAMAGE}")
+                    game.heroes.active_hero.add_damage(game)
+                    return
 
 
 class Hermione(Hero):
     def __init__(self, game_num, proficiency):
         super().__init__("Hermione", game_num, [
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Ally("Crookshanks", f"Gain 1{constants.DAMAGE} or 2{constants.HEART}", 0, base_ally_effect),
-            hogwarts.Item("Time-Turner", f"Gain 1{constants.INFLUENCE}, may put acquired Spells on top of deck", 0, time_turner_effect),
-            hogwarts.Item("The Tales of Beedle the Bard", f"Gain 2{constants.INFLUENCE}, or ALL heroes gain 1{constants.INFLUENCE}", 0, beedle_effect),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            StarterAlly("Crookshanks"),
+            TimeTurner(),
+            TalesOfBeedleTheBard(),
         ], proficiency)
         self._spells_played = 0
         self._used_ability = False
@@ -994,16 +1049,16 @@ class Hermione(Hero):
 class Ron(Hero):
     def __init__(self, game_num, proficiency):
         super().__init__("Ron", game_num, [
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Ally("Pigwidgeon", f"Gain 1{constants.DAMAGE} or 2{constants.HEART}", 0, base_ally_effect),
-            hogwarts.Item("Every-flavour Beans", f"Gain 1{constants.INFLUENCE}; for each Ally played, gain 1{constants.DAMAGE}", 0, beans_effect),
-            hogwarts.Item("Cleansweep 11", f"Gain 1{constants.DAMAGE}; if you defeat a Villain, gain 1{constants.INFLUENCE}", 0, broom_effect),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            StarterAlly("Pigwidgeon"),
+            EveryFlavourBeans(),
+            StarterBroom("Cleansweep 11"),
         ], proficiency)
         self._damage_assigned = 0
         self._used_ability = False
@@ -1050,16 +1105,16 @@ class Ron(Hero):
 class Harry(Hero):
     def __init__(self, game_num, proficiency):
         super().__init__("Harry", game_num, [
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Ally("Hedwig", f"Gain 1{constants.DAMAGE} or 2{constants.HEART}", 0, base_ally_effect),
-            hogwarts.Item("Invisibility cloak", f"Gain 1{constants.INFLUENCE}; if in hand, take only 1{constants.DAMAGE} from each Villain or Dark Arts", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Item("Firebolt", f"Gain 1{constants.DAMAGE}; if you defeat a Villain, gain 1{constants.INFLUENCE}", 0, broom_effect),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            StarterAlly("Hedwig"),
+            InvisibilityCloak(),
+            StarterBroom("Firebolt"),
         ], proficiency)
         self._used_ability = False
 
@@ -1099,16 +1154,16 @@ class Harry(Hero):
 class Neville(Hero):
     def __init__(self, game_num, proficiency):
         super().__init__("Neville", game_num, [
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Ally("Trevor", f"Gain 1{constants.DAMAGE} or 2{constants.HEART}", 0, base_ally_effect),
-            hogwarts.Item("Remembrall", f"Gain 1{constants.INFLUENCE}; if discarded, gain 2{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game), discard_effect=lambda game, hero: hero.add_influence(game, 2)),
-            hogwarts.Item("Mandrake", f"Gain 1{constants.DAMAGE}, or one hero gains 2{constants.HEART}", 0, mandrake_effect),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            StarterAlly("Trevor"),
+            Remembrall(),
+            Mandrake(),
         ], proficiency)
         self._healed_heroes = set()
 
@@ -1175,16 +1230,16 @@ class Neville(Hero):
 class Ginny(Hero):
     def __init__(self, game_num, proficiency):
         super().__init__("Ginny", game_num, [
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Ally("Arnold", f"Gain 1{constants.DAMAGE} or 2{constants.HEART}", 0, base_ally_effect),
-            hogwarts.Item("Nimbus 2000", f"Gain 1{constants.DAMAGE}; if you defeat a Villian, gain 1{constants.INFLUENCE}", 0, broom_effect),
-            hogwarts.Spell("Bat Bogey Hex", f"Gain 1{constants.DAMAGE}, or ALL heroes gain 1{constants.HEART}", 0, bat_bogey_effect),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            StarterAlly("Arnold"),
+            StarterBroom("Nimbus 2000"),
+            BatBogeyHex(),
         ], proficiency)
         self._villains_damaged = set()
         self._used_ability = False
@@ -1215,16 +1270,16 @@ class Ginny(Hero):
 class Luna(Hero):
     def __init__(self, game_num, proficiency):
         super().__init__("Luna", game_num, [
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Spell("Alohomora", f"Gain 1{constants.INFLUENCE}", 0, lambda game: game.heroes.active_hero.add_influence(game)),
-            hogwarts.Ally("Crumple-horned Snorkack", f"Gain 1{constants.DAMAGE} or 2{constants.HEART}", 0, base_ally_effect),
-            hogwarts.Item("Spectrespecs", f"Gain 1{constants.INFLUENCE}; you may reveal the top Dark Arts and choose to discard it", 0, spectrespecs_effect),
-            hogwarts.Item("Lion Hat", f"Gain 1{constants.INFLUENCE}; if another hero has broom or quidditch gear, gain 1{constants.DAMAGE}", 0, lion_hat_effect),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            Alohomora(),
+            StarterAlly("Crumple-horned Snorkack"),
+            Spectrespecs(),
+            LionHat(),
         ], proficiency)
         self._used_ability = False
 

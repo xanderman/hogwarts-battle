@@ -71,13 +71,13 @@ class VillainDeck(object):
             villain = self._deck.pop()
             self.current.append(villain)
             game.log(f"Revealed {villain.type_name}: {villain.name}")
-            villain.on_reveal(game)
+            villain._on_reveal(game)
             if death_eaters > 0 and villain.is_villain:
                 game.log(f"Death Eater (x{death_eaters}): Villain revealed, ALL heroes lose {death_eaters}{constants.HEART}")
                 game.heroes.all_heroes.remove_hearts(game, death_eaters)
         if self.voldemort_active() and not voldemort_was_active:
             game.log("Voldemort revealed!")
-            self._voldemort.on_reveal(game)
+            self._voldemort._on_reveal(game)
             if death_eaters > 0:
                 game.log(f"Death Eater (x{death_eaters}): Villain revealed, ALL heroes lose {death_eaters}{constants.HEART}")
                 game.heroes.all_heroes.remove_hearts(game, death_eaters)
@@ -200,18 +200,12 @@ def build_voldemort(game_num):
 
 
 class Foe(object):
-    def __init__(self, name, description, reward_desc, hearts=0, cost=0, effect=lambda game: None, on_reveal=lambda game: None,
-                 reward=lambda game: None, on_stun=lambda game: None, on_recover_from_stun=lambda game:None):
+    def __init__(self, name, description, reward_desc, hearts=0, cost=0):
         self.name = name
         self.description = description
         self.reward_desc = reward_desc
         self._hearts = hearts
         self._cost = cost
-        self.effect = effect
-        self.on_reveal = on_reveal
-        self._reward = reward
-        self._on_stun = on_stun
-        self._on_recover_from_stun = on_recover_from_stun
 
         self._damage = 0
         self.took_damage = False
@@ -242,7 +236,19 @@ class Foe(object):
                 self._on_recover_from_stun(game)
             return
         game.log(f"Villain: {self}")
-        self.effect(game)
+        self._effect(game)
+
+    def _on_reveal(self, game):
+        pass
+
+    def _on_stun(self, game):
+        pass
+
+    def _on_recover_from_stun(self, game):
+        pass
+
+    def _effect(self, game):
+        raise ValueError(f"Programmer Error! Forgot to implement effect for {self.name}")
 
     def end_turn(self, game):
         self.took_damage = False
@@ -324,6 +330,9 @@ class Foe(object):
         game.log(f"{self.name} defeated! {self.reward_desc}")
         self._reward(game)
 
+    def _reward(self, game):
+        raise ValueError(f"Programmer Error! Forgot to implement reward for {self.name}")
+
 
 class Villain(Foe):
     @property
@@ -361,10 +370,17 @@ class VillainCreature(Foe):
 
 class Draco(Villain):
     def __init__(self):
-        super().__init__("Draco Malfoy", f"When {constants.CONTROL} is added, active hero loses 2{constants.HEART}",
-                         f"Remove 1{constants.CONTROL}", 6,
-                         on_reveal=lambda game: game.locations.add_control_callback(game, self),
-                         reward=self.__reward)
+        super().__init__(
+                "Draco Malfoy",
+                f"When {constants.CONTROL} is added, active hero loses 2{constants.HEART}",
+                f"Remove 1{constants.CONTROL}",
+                hearts=6)
+
+    def _on_reveal(self, game):
+        game.locations.add_control_callback(game, self)
+
+    def _effect(self, game):
+        pass
 
     def control_callback(self, game, amount):
         if amount < 1:
@@ -379,7 +395,7 @@ class Draco(Villain):
     def remove_callbacks(self, game):
         game.locations.remove_control_callback(game, self)
 
-    def __reward(self, game):
+    def _reward(self, game):
         game.locations.remove_control(game)
 
 VILLAINS_BY_NAME["Draco Malfoy"] = Draco
@@ -387,10 +403,17 @@ VILLAINS_BY_NAME["Draco Malfoy"] = Draco
 
 class Crabbe(Villain):
     def __init__(self):
-        super().__init__("Crabbe & Goyle", f"When forced to discard, lose 1{constants.HEART}",
-                         "ALL heroes draw 1 card", 5,
-                         on_reveal=lambda game: game.heroes.add_discard_callback(game, self),
-                         reward=self.__reward)
+        super().__init__(
+                "Crabbe & Goyle",
+                f"When forced to discard, lose 1{constants.HEART}",
+                "ALL heroes draw 1 card",
+                hearts=5)
+
+    def _on_reveal(self, game):
+        game.heroes.add_discard_callback(game, self)
+
+    def _effect(self, game):
+        pass
 
     def discard_callback(self, game, hero):
         if self._stunned:
@@ -402,7 +425,7 @@ class Crabbe(Villain):
     def remove_callbacks(self, game):
         game.heroes.remove_discard_callback(game, self)
 
-    def __reward(self, game):
+    def _reward(self, game):
         game.heroes.all_heroes.draw(game)
 
 VILLAINS_BY_NAME["Crabbe & Goyle"] = Crabbe
@@ -410,14 +433,16 @@ VILLAINS_BY_NAME["Crabbe & Goyle"] = Crabbe
 
 class Quirrel(Villain):
     def __init__(self):
-        super().__init__("Quirinus Quirrell", f"Active hero loses 1{constants.HEART}",
-            f"ALL heroes gain 1{constants.HEART} and 1{constants.INFLUENCE}", 6,
-            effect=self.__effect, reward=self.__reward)
+        super().__init__(
+                "Quirinus Quirrell",
+                f"Active hero loses 1{constants.HEART}",
+                f"ALL heroes gain 1{constants.HEART} and 1{constants.INFLUENCE}",
+                hearts=6)
 
-    def __effect(self, game):
+    def _effect(self, game):
         game.heroes.active_hero.remove_hearts(game, 1)
 
-    def __reward(self, game):
+    def _reward(self, game):
         game.heroes.all_heroes.add(game, influence=1, hearts=1)
 
 VILLAINS_BY_NAME["Quirinus Quirrell"] = Quirrel
@@ -432,10 +457,17 @@ game_one_villains = [
 
 class Lucius(Villain):
     def __init__(self):
-        super().__init__("Lucius Malfoy", f"When {constants.CONTROL} is added, all villains heal 1{constants.DAMAGE}",
-                         f"ALL heroes gain 1{constants.INFLUENCE}, remove 1{constants.CONTROL}", 7,
-                         on_reveal=lambda game: game.locations.add_control_callback(game, self),
-                         reward=self.__reward)
+        super().__init__(
+                "Lucius Malfoy",
+                f"When {constants.CONTROL} is added, all villains heal 1{constants.DAMAGE}",
+                f"ALL heroes gain 1{constants.INFLUENCE}, remove 1{constants.CONTROL}",
+                hearts=7)
+
+    def _on_reveal(self, game):
+        game.locations.add_control_callback(game, self)
+
+    def _effect(self, game):
+        pass
 
     def control_callback(self, game, amount):
         if amount < 1:
@@ -450,7 +482,7 @@ class Lucius(Villain):
     def remove_callbacks(self, game):
         game.locations.remove_control_callback(game, self)
 
-    def __reward(self, game):
+    def _reward(self, game):
         game.heroes.all_heroes.add_influence(game, 1)
         game.locations.remove_control(game)
 
@@ -459,16 +491,28 @@ VILLAINS_BY_NAME["Lucius Malfoy"] = Lucius
 
 class Basilisk(VillainCreature):
     def __init__(self):
-        super().__init__("Basilisk", "Heroes cannot draw extra cards",
-                         f"ALL heroes gain 1{constants.INFLUENCE}, remove 1{constants.CONTROL}", 8,
-                         on_reveal=lambda game: game.heroes.basilisk_revealed(game),
-                         reward=self.__reward, on_stun=lambda game: game.heroes.basilisk_defeated(game),
-                         on_recover_from_stun=lambda game: game.heroes.basilisk_revealed(game))
+        super().__init__(
+                "Basilisk",
+                "Heroes cannot draw extra cards",
+                f"ALL heroes gain 1{constants.INFLUENCE}, remove 1{constants.CONTROL}",
+                hearts=8)
+
+    def _on_reveal(self, game):
+        game.heroes.disallow_drawing(game)
+
+    def _on_stun(self, game):
+        game.heroes.allow_drawing(game)
+
+    def _on_recover_from_stun(self, game):
+        game.heroes.disallow_drawing(game)
+
+    def _effect(self, game):
+        pass
 
     def remove_callbacks(self, game):
-        game.heroes.basilisk_defeated(game)
+        game.heroes.allow_drawing(game)
 
-    def __reward(self, game):
+    def _reward(self, game):
         game.heroes.all_heroes.draw(game)
         game.locations.remove_control(game)
 
@@ -477,11 +521,13 @@ VILLAINS_BY_NAME["Basilisk"] = Basilisk
 
 class TomRiddle(Villain):
     def __init__(self):
-        super().__init__("Tom Riddle", f"For each Ally in hand, lose 2{constants.HEART} or discard a card",
-            f"ALL heroes gain 2{constants.HEART} or take Ally from discard", 6,
-            effect=self.__effect, reward=self.__reward)
+        super().__init__(
+                "Tom Riddle",
+                f"For each Ally in hand, lose 2{constants.HEART} or discard a card",
+                f"ALL heroes gain 2{constants.HEART} or take Ally from discard",
+                hearts=6)
 
-    def __effect(self, game):
+    def _effect(self, game):
         hero = game.heroes.active_hero
         allies = sum(1 for card in hero._hand if card.is_ally())
         if allies == 0:
@@ -499,7 +545,7 @@ class TomRiddle(Villain):
             else:
                 hero.discard(game, int(choice))
 
-    def __reward(self, game):
+    def _reward(self, game):
         game.heroes.all_heroes.effect(game, self.__per_hero)
 
     def __per_hero(self, game, hero):
@@ -532,12 +578,16 @@ game_two_villains = [
 
 class Dementor(VillainCreature):
     def __init__(self):
-        super().__init__("Dementy-whatsit", f"Active hero loses 2{constants.HEART}",
-                         f"ALL heroes gain 2{constants.HEART}; remove 1{constants.CONTROL}", 8,
-                         effect=lambda game: game.heroes.active_hero.remove_hearts(game, 2),
-                         reward=self.__reward)
+        super().__init__(
+                "Dementy-whatsit",
+                f"Active hero loses 2{constants.HEART}",
+                f"ALL heroes gain 2{constants.HEART}; remove 1{constants.CONTROL}",
+                hearts=8)
 
-    def __reward(self, game):
+    def _effect(self, game):
+        game.heroes.active_hero.remove_hearts(game, 2)
+
+    def _reward(self, game):
         game.heroes.all_heroes.add_hearts(game, 2)
         game.locations.remove_control(game)
 
@@ -546,11 +596,13 @@ VILLAINS_BY_NAME["Dementor"] = Dementor
 
 class PeterPettigrew(Villain):
     def __init__(self):
-        super().__init__("Peter Pettigrew", f"Reveal top card of deck, if costs 1{constants.INFLUENCE} or more, discard and add 1{constants.CONTROL}",
-                f"ALL heroes may take Spell from discard; remove 1{constants.CONTROL}", 7,
-                effect=self.__effect, reward=self.__reward)
+        super().__init__(
+                "Peter Pettigrew",
+                f"Reveal top card of deck, if costs 1{constants.INFLUENCE} or more, discard and add 1{constants.CONTROL}",
+                f"ALL heroes may take Spell from discard; remove 1{constants.CONTROL}",
+                hearts=7)
 
-    def __effect(self, game):
+    def _effect(self, game):
         hero = game.heroes.active_hero
         card = hero.reveal_top_card(game)
         if card is None:
@@ -561,7 +613,7 @@ class PeterPettigrew(Villain):
             game.heroes.active_hero.discard_top_card(game)
             game.locations.add_control(game)
 
-    def __reward(self, game):
+    def _reward(self, game):
         game.locations.remove_control(game)
         game.heroes.all_heroes.effect(game, self.__per_hero)
 
@@ -595,11 +647,16 @@ game_three_villains = [
 
 class DeathEater(Villain):
     def __init__(self):
-        super().__init__("Death Eater", f"If Morsmordre or new Villain revealed, ALL Heroes lose 1{constants.HEART}",
-                f"ALL heroes gain 1{constants.HEART}; remove 1{constants.CONTROL}", 7,
-                reward=self.__reward),
+        super().__init__(
+                "Death Eater",
+                f"If Morsmordre or new Villain revealed, ALL Heroes lose 1{constants.HEART}",
+                f"ALL heroes gain 1{constants.HEART}; remove 1{constants.CONTROL}",
+                hearts=7)
 
-    def __reward(self, game):
+    def _effect(self, game):
+        pass
+
+    def _reward(self, game):
         game.heroes.all_heroes.add_hearts(game, 1)
         game.locations.remove_control(game)
 
@@ -608,15 +665,28 @@ VILLAINS_BY_NAME["Death Eater"] = DeathEater
 
 class BartyCrouch(Villain):
     def __init__(self):
-        super().__init__("Barty Crouch Jr.", f"Heroes cannot remove {constants.CONTROL}", f"Remove 2{constants.CONTROL}", 7,
-                on_reveal=lambda game: game.locations.disallow_remove_control(game),
-                reward=self.__reward, on_stun=lambda game: game.locations.allow_remove_control(game),
-                on_recover_from_stun=lambda game: game.locations.disallow_remove_control(game)),
+        super().__init__(
+                "Barty Crouch Jr.",
+                f"Heroes cannot remove {constants.CONTROL}",
+                f"Remove 2{constants.CONTROL}",
+                hearts=7)
+
+    def _on_reveal(self, game):
+        game.locations.disallow_remove_control(game)
+
+    def _on_stun(self, game):
+        game.locations.allow_remove_control(game)
+
+    def _on_recover_from_stun(self, game):
+        game.locations.disallow_remove_control(game)
+
+    def _effect(self, game):
+        pass
 
     def remove_callbacks(self, game):
         game.locations.allow_remove_control(game)
 
-    def __reward(self, game):
+    def _reward(self, game):
         game.locations.remove_control(game, 2)
 
 VILLAINS_BY_NAME["Barty Crouch Jr."] = BartyCrouch
@@ -629,10 +699,17 @@ game_four_villains = [
 
 class Umbridge(Villain):
     def __init__(self):
-        super().__init__("Dolores Umbridge", f"If acquire card with cost 4{constants.INFLUENCE} or more, lose 1{constants.HEART}",
-                         f"ALL heroes gain 1{constants.INFLUENCE} and 2{constants.HEART}", 7,
-                         on_reveal=lambda game: game.heroes.add_acquire_callback(game, self),
-                         reward=self.__reward),
+        super().__init__(
+                "Dolores Umbridge",
+                f"If acquire card with cost 4{constants.INFLUENCE} or more, lose 1{constants.HEART}",
+                f"ALL heroes gain 1{constants.INFLUENCE} and 2{constants.HEART}",
+                hearts=7)
+
+    def _on_reveal(self, game):
+        game.heroes.add_acquire_callback(game, self)
+
+    def _effect(self, game):
+        pass
 
     def acquire_callback(self, game, hero, card):
         if card.cost >= 4:
@@ -645,7 +722,7 @@ class Umbridge(Villain):
     def remove_callbacks(self, game):
         game.heroes.remove_acquire_callback(game, self)
 
-    def __reward(self, game):
+    def _reward(self, game):
         game.heroes.all_heroes.add(game, influence=1, hearts=2)
 
 VILLAINS_BY_NAME["Dolores Umbridge"] = Umbridge
@@ -658,18 +735,31 @@ game_five_villains = [
 
 class GameFiveVoldemort(Villain):
     def __init__(self):
-        super().__init__("Lord Voldemort", f"Active hero loses 1{constants.HEART} and discards a card",
-                         "You win!", 10, effect=lambda game: game.heroes.active_hero.add(game, hearts=-1, cards=-1))
+        super().__init__(
+                "Lord Voldemort",
+                f"Active hero loses 1{constants.HEART} and discards a card",
+                "You win!",
+                hearts=10)
+
+    def _effect(self, game):
+        game.heroes.active_hero.add(game, hearts=-1, cards=-1)
+
+    def _reward(self, game):
+        pass
 
 
 class BellatrixLestrange(Villain):
     def __init__(self):
-        super().__init__("Bellatrix Lestrange", "Reveal an additional Dark Arts event each turn",
-                f"ALL heroes may take Item from discard; remove 2{constants.CONTROL}", 9,
-                effect=lambda game: game.dark_arts_deck.play(game, 1),
-                reward=self.__reward),
+        super().__init__(
+                "Bellatrix Lestrange",
+                "Reveal an additional Dark Arts event each turn",
+                f"ALL heroes may take Item from discard; remove 2{constants.CONTROL}",
+                hearts=9),
 
-    def __reward(self, game):
+    def _effect(self, game):
+        game.dark_arts_deck.play(game, 1)
+
+    def _reward(self, game):
         game.locations.remove_control(game, 2)
         game.heroes.all_heroes.effect(game, self.__per_hero)
 
@@ -698,15 +788,25 @@ VILLAINS_BY_NAME["Bellatrix Lestrange"] = BellatrixLestrange
 
 class FenrirGreyback(Villain):
     def __init__(self):
-        super().__init__("Fenrir Greyback", f"Heroes cannot gain {constants.HEART}", f"ALL heroes gain 3{constants.HEART}, remove 2{constants.CONTROL}", 8,
-                on_reveal=lambda game: game.heroes.greyback_revealed(game),
-                reward=self.__reward, on_stun=lambda game: game.heroes.greyback_defeated(game),
-                on_recover_from_stun=lambda game: game.heroes.greyback_revealed(game)),
+        super().__init__(
+                "Fenrir Greyback",
+                f"Heroes cannot gain {constants.HEART}",
+                f"ALL heroes gain 3{constants.HEART}, remove 2{constants.CONTROL}",
+                hearts=8)
+
+    def _on_reveal(self, game):
+        game.heroes.disallow_healing(game)
+
+    def _on_stun(self, game):
+        game.heroes.allow_healing(game)
+
+    def _on_recover_from_stun(self, game):
+        game.heroes.disallow_healing(game)
 
     def remove_callbacks(self, game):
-        game.heroes.greyback_defeated(game)
+        game.heroes.allow_healing(game)
 
-    def __reward(self, game):
+    def _reward(self, game):
         game.heroes.all_heroes.add_hearts(game, 3)
         game.locations.remove_control(game, 2)
 
@@ -721,10 +821,13 @@ game_six_villains = [
 
 class GameSixVoldemort(Villain):
     def __init__(self):
-        super().__init__("Lord Voldemort", "Roll the Slytherin die",
-                         "You win!", 15, effect=self.__effect)
+        super().__init__(
+                "Lord Voldemort",
+                "Roll the Slytherin die",
+                "You win!",
+                hearts=15)
 
-    def __effect(self, game):
+    def _effect(self, game):
         faces = [constants.DAMAGE, constants.DAMAGE, constants.DAMAGE, constants.INFLUENCE, constants.HEART, constants.CARD]
         die_result = random.choice(faces)
         if game.heroes.active_hero._proficiency.can_reroll_house_dice and game.input(f"Rolled {die_result}, (a)ccept or (r)eroll? ", "ar") == "r":
@@ -742,15 +845,25 @@ class GameSixVoldemort(Villain):
             game.log(f"Rolled {constants.CARD}, ALL heroes discard a card")
             game.heroes.all_heroes.choose_and_discard(game)
 
+    def _reward(self, game):
+        pass
+
 game_seven_villains = [
 ]
 
 class GameSevenVoldemort(Villain):
     def __init__(self):
-        super().__init__("Lord Voldemort", f"Add 1{constants.CONTROL}; each time {constants.CONTROL} is removed, ALL heroes lose 1{constants.HEART}",
-                         "You win!", 20, effect=lambda game: game.locations.add_control(game),
-                         on_reveal=lambda game: game.locations.add_control_callback(game, self),
-                         reward=lambda game: game.locations.remove_control_callback(game, self))
+        super().__init__(
+                "Lord Voldemort",
+                f"Add 1{constants.CONTROL}; each time {constants.CONTROL} is removed, ALL heroes lose 1{constants.HEART}",
+                "You win!",
+                hearts=20)
+
+    def _on_reveal(self, game):
+        game.locations.add_control_callback(game, self)
+
+    def _effect(self, game):
+        game.locations.add_control(game)
 
     def control_callback(self, game, amount):
         if amount > -1:
@@ -761,6 +874,12 @@ class GameSevenVoldemort(Villain):
         game.log(f"{self.name}: {constants.CONTROL} removed, ALL heroes lose 1{constants.HEART} for each")
         for _ in range(-amount):
             game.heroes.all_heroes.remove_hearts(game, 1)
+
+    def remove_callbacks(self, game):
+        game.locations.remove_control_callback(game, self)
+
+    def _reward(self, game):
+        pass
 
 
 BASE_VILLAINS = [
@@ -776,11 +895,13 @@ BASE_VILLAINS = [
 
 class CornishPixies(Creature):
     def __init__(self):
-        super().__init__("Cornish Pixies", f"For each card in hand with EVEN {constants.INFLUENCE} cost, lose 2{constants.HEART}",
-                         f"ALL heroes gain 2{constants.HEART} and 1{constants.INFLUENCE}", 6,
-                         effect=self.__effect, reward=self.__reward)
+        super().__init__(
+                "Cornish Pixies",
+                f"For each card in hand with EVEN {constants.INFLUENCE} cost, lose 2{constants.HEART}",
+                f"ALL heroes gain 2{constants.HEART} and 1{constants.INFLUENCE}",
+                hearts=6)
 
-    def __effect(self, game):
+    def _effect(self, game):
         hero = game.heroes.active_hero
         evens = sum(1 for card in hero._hand if card.even_cost)
         if evens == 0:
@@ -789,7 +910,7 @@ class CornishPixies(Creature):
         game.log(f"{hero.name} has {evens} cards with EVEN {constants.INFLUENCE} cost in hand")
         hero.remove_hearts(game, 2 * evens)
 
-    def __reward(self, game):
+    def _reward(self, game):
         game.heroes.all_heroes.add(game, hearts=2, influence=1)
 
 VILLAINS_BY_NAME["Cornish Pixies"] = CornishPixies
@@ -797,17 +918,19 @@ VILLAINS_BY_NAME["Cornish Pixies"] = CornishPixies
 
 class Norbert(Creature):
     def __init__(self):
-        super().__init__("Norbert", f"Active hero loses 1{constants.HEART} plus 1{constants.HEART} for each Detention! in hand",
-                         f"ALL heroes may banish a card from hand or discard", 6,
-                         effect=self.__effect, reward=self.__reward)
+        super().__init__(
+                "Norbert",
+                f"Active hero loses 1{constants.HEART} plus 1{constants.HEART} for each Detention! in hand",
+                f"ALL heroes may banish a card from hand or discard",
+                hearts=6)
 
-    def __effect(self, game):
+    def _effect(self, game):
         hero = game.heroes.active_hero
         detentions = sum(1 for card in hero._hand if card.name == "Detention!")
         game.log(f"{hero.name} has {detentions} Detention! in hand")
         hero.remove_hearts(game, 1 + detentions)
 
-    def __reward(self, game):
+    def _reward(self, game):
         game.heroes.all_heroes.choose_and_banish(game)
 
 VILLAINS_BY_NAME["Norbert"] = Norbert
@@ -815,11 +938,13 @@ VILLAINS_BY_NAME["Norbert"] = Norbert
 
 class Troll(Creature):
     def __init__(self):
-        super().__init__("Troll", f"Choose: lose 2{constants.HEART} or add Detention! to discard",
-                         f"ALL heroes gain 1{constants.HEART} and may banish an Item from hand or discard", 7,
-                         effect=self.__effect, reward=self.__reward)
+        super().__init__(
+                "Troll",
+                f"Choose: lose 2{constants.HEART} or add Detention! to discard",
+                f"ALL heroes gain 1{constants.HEART} and may banish an Item from hand or discard",
+                hearts=7)
 
-    def __effect(self, game):
+    def _effect(self, game):
         hero = game.heroes.active_hero
         if hero.is_stunned:
             game.log(f"{hero.name} is stunned and can't lose {constants.HEART}. No penalty for {self.name}!")
@@ -832,7 +957,7 @@ class Troll(Creature):
         else:
             raise Exception("Invalid choice")
 
-    def __reward(self, game):
+    def _reward(self, game):
         game.heroes.all_heroes.effect(game, self.__reward_per_hero)
 
     def __reward_per_hero(self, game, hero):
@@ -844,11 +969,13 @@ VILLAINS_BY_NAME["Troll"] = Troll
 
 class Fluffy(Creature):
     def __init__(self):
-        super().__init__("Fluffy", f"For each Item in hand, lose 1{constants.HEART} or discard a card",
-                         f"ALL heroes gain 1{constants.HEART} and draw a card", 8,
-                         effect=self.__effect, reward=self.__reward)
+        super().__init__(
+                "Fluffy",
+                f"For each Item in hand, lose 1{constants.HEART} or discard a card",
+                f"ALL heroes gain 1{constants.HEART} and draw a card",
+                hearts=8)
 
-    def __effect(self, game):
+    def _effect(self, game):
         hero = game.heroes.active_hero
         items = sum(1 for card in hero._hand if card.is_item())
         if items == 0:
@@ -866,7 +993,7 @@ class Fluffy(Creature):
             else:
                 hero.discard(game, int(choice))
 
-    def __reward(self, game):
+    def _reward(self, game):
         game.heroes.all_heroes.add(game, hearts=1, cards=1)
 
 VILLAINS_BY_NAME["Fluffy"] = Fluffy
@@ -874,11 +1001,13 @@ VILLAINS_BY_NAME["Fluffy"] = Fluffy
 
 class Boggart(Creature):
     def __init__(self):
-        super().__init__("Boggart", "Roll the Creature die",
-                         "Roll the Creature die", 5, 3,
-                         effect=self.__effect, reward=self.__reward)
+        super().__init__(
+                "Boggart",
+                "Roll the Creature die",
+                "Roll the Creature die",
+                hearts=5, cost=3)
 
-    def __effect(self, game):
+    def _effect(self, game):
         faces = [constants.HEART, constants.HEART + constants.HEART, constants.CARD, constants.CARD + constants.CARD, constants.DAMAGE, constants.CONTROL]
         die_result = random.choice(faces)
         if die_result == constants.HEART:
@@ -902,7 +1031,7 @@ class Boggart(Creature):
             game.log(f"Rolled {constants.CARD}{constants.CARD}, active hero discards 2 cards")
             game.heroes.active_hero.choose_and_discard(game, 2)
 
-    def __reward(self, game):
+    def _reward(self, game):
         game.roll_creature_die()
 
 VILLAINS_BY_NAME["Boggart"] = Boggart
@@ -910,11 +1039,19 @@ VILLAINS_BY_NAME["Boggart"] = Boggart
 
 class Werewolf(Creature):
     def __init__(self):
-        super().__init__("Werewolf", f"If active hero loses 4{constants.HEART}, add 1{constants.CONTROL}",
-                         f"ALL heroes gain 1{constants.INFLUENCE} or 2{constants.HEART}; remove 1{constants.CONTROL}",
-                         5, 4, on_reveal=lambda game: game.heroes.add_hearts_callback(game, self), reward=self.__reward)
+        super().__init__(
+                "Werewolf",
+                f"If active hero loses 4{constants.HEART}, add 1{constants.CONTROL}",
+                f"ALL heroes gain 1{constants.INFLUENCE} or 2{constants.HEART}; remove 1{constants.CONTROL}",
+                hearts=5, cost=4)
         self._hero_damage_taken = 0
         self._used_ability = False
+
+    def _on_reveal(self, game):
+        game.heroes.add_hearts_callback(game, self)
+
+    def _effect(self, game):
+        pass
 
     def end_turn(self, game):
         super().end_turn(game)
@@ -938,7 +1075,7 @@ class Werewolf(Creature):
     def remove_callbacks(self, game):
         game.heroes.remove_hearts_callback(game, self)
 
-    def __reward(self, game):
+    def _reward(self, game):
         game.locations.remove_control(game)
         game.heroes.all_heroes.effect(game, self.__per_hero)
 
@@ -961,11 +1098,13 @@ VILLAINS_BY_NAME["Werewolf"] = Werewolf
 
 class Scabbers(VillainCreature):
     def __init__(self):
-        super().__init__("Scabbers", f"Reveal top card of deck, if costs 1{constants.INFLUENCE} or more, discard and lose 2{constants.HEART}",
-                        f"ALL heroes may take card with cost <= 3{constants.INFLUENCE} from discard; remove 1{constants.CONTROL}", 7,
-                         effect=self.__effect, reward=self.__reward)
+        super().__init__(
+                "Scabbers",
+                f"Reveal top card of deck, if costs 1{constants.INFLUENCE} or more, discard and lose 2{constants.HEART}",
+                f"ALL heroes may take card with cost <= 3{constants.INFLUENCE} from discard; remove 1{constants.CONTROL}",
+                hearts=7)
 
-    def __effect(self, game):
+    def _effect(self, game):
         hero = game.heroes.active_hero
         card = hero.reveal_top_card(game)
         if card is None:
@@ -976,7 +1115,7 @@ class Scabbers(VillainCreature):
             hero.discard_top_card(game)
             hero.remove_hearts(game, 2)
 
-    def __reward(self, game):
+    def _reward(self, game):
         game.locations.remove_control(game)
         game.heroes.all_heroes.effect(game, self.__per_hero)
 

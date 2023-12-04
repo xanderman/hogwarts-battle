@@ -15,7 +15,7 @@ class Locations(object):
         self._current = 0
         self._control_callbacks = []
         # simple ref counter of reasons why control cannot be removed
-        self._control_remove_allowed = 0
+        self._control_remove_disallowed = 0
 
     def _init_window(self):
         self._window.box()
@@ -59,13 +59,13 @@ class Locations(object):
 
     @property
     def can_remove_control(self):
-        return self._control_remove_allowed == 0 and self.current._control > 0
+        return self._control_remove_disallowed == 0 and self.current._control > 0
 
     def allow_remove_control(self, game):
-        self._control_remove_allowed = max(0, self._control_remove_allowed - 1)
+        self._control_remove_disallowed = max(0, self._control_remove_disallowed - 1)
 
     def disallow_remove_control(self, game):
-        self._control_remove_allowed += 1
+        self._control_remove_disallowed += 1
 
     def add_control(self, game, amount=1):
         if amount < 0 and not self.can_remove_control:

@@ -169,7 +169,7 @@ class Game(object):
 
         self.log("-----Cleanup phase-----")
         self.heroes.all_heroes.recover_from_stun(self)
-        self.dark_arts_deck.end_turn()
+        self.dark_arts_deck.end_turn(self)
         if self.encounters is not None:
             self.encounters.check_completion(self)
         self.villain_deck.reveal(self)
@@ -262,7 +262,7 @@ class GameNumAction(argparse.Action):
     def __call__(self, parser, namespace, value, option_string=None):
         try:
             base_game_num = int(value)
-            if value < 1 or value > 7:
+            if base_game_num < 1 or base_game_num > 7:
                 parser.error("Game number must be between 1 and 7")
             setattr(namespace, self.dest, base_game_num)
         except ValueError:
@@ -279,8 +279,9 @@ class HeroArgAction(argparse.Action):
         chosen_heroes = []
         for hero_name in values:
             parts = hero_name.split(":")
-            if isinstance(game_num, int) and game_num < 6 and len(parts) > 1:
-                parser.error(f"Proficiencies cannot be used in game {game_num}")
+            if isinstance(game_num, int) and game_num < 6:
+                if len(parts) > 1:
+                    parser.error(f"Proficiencies cannot be used in game {game_num}")
             elif len(parts) == 1:
                 parser.error(f"Proficiencies must be specified in game {game_num}")
             if len(parts) > 2:
