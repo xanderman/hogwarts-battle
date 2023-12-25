@@ -341,7 +341,7 @@ class PolyjuicePotion(Item):
             return
         if len(played_allies) == 1:
             game.log(f"Only one ally played, copying {played_allies[0].name}")
-            played_allies[0].effect(game)
+            played_allies[0]._effect(game)
             return
         while True:
             choice = int(game.input("Choose played ally to polyjuice: ", range(len(game.heroes.active_hero._play_area))))
@@ -350,7 +350,7 @@ class PolyjuicePotion(Item):
                 game.log("{card.name} is not an ally!")
                 continue
             game.log(f"Copying {card.name}")
-            card.effect(game)
+            card._effect(game)
             break
 
 
@@ -987,7 +987,7 @@ class ElderWand(Item):
     def __init__(self):
         super().__init__("Elder Wand", f"For each Spell played gain 1{constants.DAMAGE} and 1{constants.HEART}", 7)
 
-    def _effect(game):
+    def _effect(self, game):
         for card in game.heroes.active_hero._play_area:
             if card.is_spell():
                 game.log(f"Spell {card.name} already played, elder wand adds 1{constants.DAMAGE} and 1{constants.HEART}")

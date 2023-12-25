@@ -803,6 +803,9 @@ class FenrirGreyback(Villain):
     def _on_recover_from_stun(self, game):
         game.heroes.disallow_healing(game)
 
+    def _effect(self, game):
+        pass
+
     def remove_callbacks(self, game):
         game.heroes.allow_healing(game)
 
