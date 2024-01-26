@@ -536,7 +536,10 @@ class SiriusBlack(Ally):
 
 class SybillTrelawney(Ally):
     def __init__(self):
-        super().__init__("Sybill Trelawney", f"Draw 2 cards; discard one card. If you discard a Spell, gain 2{constants.INFLUENCE}", 4)
+        super().__init__(
+            "Sybill Trelawney",
+            f"Draw 2 cards; discard one card. If you discard a Spell, gain 2{constants.INFLUENCE}",
+            4)
 
     def _effect(self, game):
         hero = game.heroes.active_hero
@@ -1115,8 +1118,8 @@ class OldSock(Item):
             if hero == game.heroes.active_hero:
                 continue
             for card in hero._discard:
-                if card.name == "Dobby":
-                    game.log(f"{hero.name} has Dobby, {self.name} adds 2{constants.DAMAGE}")
+                if card.name == "Dobby" or card.name == "Kreacher":
+                    game.log(f"{hero.name} has {card.name}, {self.name} adds 2{constants.DAMAGE}")
                     game.heroes.active_hero.add_damage(game, 2)
                     return
 
@@ -1267,7 +1270,112 @@ monster_box_two_cards = [
 ]
 
 
+class Kreacher(Ally):
+    def __init__(self):
+        super().__init__(
+            "Kreacher",
+            f"Roll the Creature die. One hero may banish a card in hand or discard",
+            5)
+
+    def _effect(self, game):
+        game.roll_creature_die()
+        game.heroes.choose_hero(game, prompt=f"Choose hero to banish a card: ", optional=True).choose_and_banish(game)
+
+
+class Thestral(Ally):
+    def __init__(self):
+        super().__init__(
+            "Thestral",
+            f"ALL heroes choose to gain 1{constants.INFLUENCE} or 2{constants.HEART}",
+            4)
+
+    def _effect(self, game):
+        for hero in game.heroes.all_heroes:
+            if not hero.healing_allowed:
+                game.log(f"{hero.name} can't heal, gaining 1{constants.INFLUENCE}")
+                hero.add_influence(game, 1)
+                continue
+            if not hero.gaining_tokens_allowed(game):
+                game.log(f"{hero.name} not allowed to gain tokens, gaining 2{constants.HEART}")
+                hero.add_hearts(game, 2)
+                continue
+            choice = game.input(f"Choose {hero.name} gains (i) 1{constants.INFLUENCE} or (h) 2{constants.HEART}: ", "ih")
+            if choice == 'i':
+                hero.add_influence(game, 1)
+            elif choice == 'h':
+                hero.add_hearts(game, 2)
+
+
+class Griphook(Ally):
+    def __init__(self):
+        super().__init__(
+            "Griphook",
+            f"Draw 3 cards; discard two. For each Item discarded, gain 2{constants.INFLUENCE}",
+            6)
+
+    def _effect(self, game):
+        hero = game.heroes.active_hero
+        if hero.drawing_allowed:
+            hero.draw(game, 3)
+        elif game.input("Drawing not allowed, still discard? (y/n): ", "yn") == 'n':
+            return
+        discarded = hero.choose_and_discard(game, 2, with_callbacks=False)
+        for card in discarded:
+            if card.is_item():
+                game.log(f"Discarded item {card.name}, gaining 2{constants.INFLUENCE}")
+                hero.add_influence(game, 2)
+
+
+class ErumpentHorn(Item):
+    def __init__(self):
+        super().__init__(
+            "Erumpent Horn",
+            f"Lose 2{constants.HEART}; Gain 3{constants.DAMAGE}",
+            5)
+
+    def _effect(self, game):
+        game.heroes.active_hero.remove_hearts(game, 2)
+        game.heroes.active_hero.add_damage(game, 3)
+
+
+class LacewingFlies(Item):
+    def __init__(self):
+        super().__init__(
+            "Lacewing Flies",
+            f"One hero draws a card. If discarded, gain 1{constants.DAMAGE}",
+            2)
+
+    def _effect(self, game):
+        if not game.heroes.drawing_allowed:
+            game.log("Drawing not allowed, skipping draw effect")
+            return
+        game.heroes.choose_hero(game, prompt=f"Choose hero to draw a card: ").draw(game)
+
+    def discard_effect(self, game, hero):
+        hero.add_damage(game)
+
+
+class Nox(Spell):
+    def __init__(self):
+        super().__init__(
+            "Nox",
+            f"Gain 1{constants.DAMAGE}; ALL heroes may banish a card in hand or discard",
+            6)
+
+    def _effect(self, game):
+        game.heroes.active_hero.add_damage(game, 1)
+        game.heroes.all_heroes.choose_and_banish(game)
+
+
 monster_box_three_cards = [
+    Kreacher(),
+    Thestral(),
+    Griphook(),
+    ErumpentHorn(),
+    LacewingFlies(),
+    LacewingFlies(),
+    Nox(),
+    Nox(),
 ]
 
 

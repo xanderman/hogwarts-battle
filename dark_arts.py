@@ -361,8 +361,8 @@ class Imperio(DarkArtsCard):
             f"Choose another hero to lose 2{constants.HEART}; reveal another card")
 
     def _effect(self, game):
-        game.heroes.choose_hero(game, prompt=f"Choose hero to lose 2{constants.HEART}: ", disallow=game.heroes.active_hero,
-                                disallow_msg="Active hero cannot be chosen!").remove_hearts(game, 2)
+        game.heroes.choose_hero(game, prompt=f"Choose hero to lose 2{constants.HEART}: ",
+                                disallow=game.heroes.active_hero).remove_hearts(game, 2)
         game.dark_arts_deck.play(game, 1)
 
 
@@ -391,7 +391,7 @@ class HeirOfSlytherin(DarkArtsCard):
     def _effect(self, game):
         faces = [constants.DAMAGE, constants.DAMAGE, constants.DAMAGE, constants.INFLUENCE, constants.HEART, constants.CARD]
         die_result = random.choice(faces)
-        if game.heroes.active_hero._proficiency.can_reroll_house_dice and game.input(f"Rolled {die_result}, (a)ccept or (r)eroll? ", "ar") == "r":
+        if game.heroes.active_hero.can_reroll_die(house_die=True) and game.input(f"Rolled {die_result}, (a)ccept or (r)eroll? ", "ar") == "r":
             die_result = random.choice(faces)
         if die_result == constants.DAMAGE:
             game.log(f"Rolled {constants.DAMAGE}, ALL heroes lose 1{constants.HEART}")
@@ -662,7 +662,88 @@ monster_box_two_cards = [
     Bombarda(),
 ]
 
+
+class CentaurAttack(DarkArtsCard):
+    def __init__(self):
+        super().__init__(
+            "Centaur Attack",
+            f"ALL heroes with >=3 Spells lose 1{constants.HEART}")
+
+    def _effect(self, game):
+        game.heroes.all_heroes.effect(game, self.__per_hero)
+
+    def __per_hero(self, game, hero):
+        spells = sum(1 for card in hero._hand if card.is_spell())
+        game.log(f"Centaur Attack: {hero.name} has {spells} Spells")
+        if spells >= 3:
+            hero.remove_hearts(game, 1)
+
+
+class FightAndFlight(DarkArtsCard):
+    def __init__(self):
+        super().__init__(
+            "Fight and Flight",
+            f"Add 2{constants.CONTROL}")
+
+    def _effect(self, game):
+        game.locations.add_control(game, 2)
+
+
+class AcromantulaAttack(DarkArtsCard):
+    def __init__(self):
+        super().__init__(
+            "Acromantula Attack",
+            f"ALL heroes reveal top card, if it costs 0{constants.INFLUENCE} discard it and lose 1{constants.HEART}")
+
+    def _effect(self, game):
+        game.heroes.all_heroes.effect(game, self.__per_hero)
+
+    def __per_hero(self, game, hero):
+        card = hero.reveal_top_card(game)
+        if card is None:
+            game.log(f"{hero.name} has no cards left to reveal")
+            return
+        game.log(f"{hero.name} revealed {card}")
+        if card.cost == 0:
+            hero.discard_top_card(game)
+            hero.remove_hearts(game, 1)
+
+
+class SeriouslyMisunderstoodCreatures(DarkArtsCard):
+    def __init__(self):
+        super().__init__(
+            "Seriously Misunderstood Creatures",
+            f"Roll the Creature die")
+
+    def _effect(self, game):
+        faces = [constants.HEART, constants.HEART + constants.HEART, constants.CARD, constants.CARD + constants.CARD, constants.DAMAGE, constants.CONTROL]
+        die_result = random.choice(faces)
+        if game.heroes.active_hero.can_reroll_die(house_die=False) and game.input(f"Rolled {die_result}, (a)ccept or (r)eroll? ", "ar") == "r":
+            die_result = random.choice(faces)
+        if die_result == constants.HEART or die_result == constants.HEART + constants.HEART:
+            game.log(f"Rolled {constants.HEART}{constants.HEART}, ALL foes heal 1{constants.DAMAGE} and/or {constants.INFLUENCE}")
+            game.villain_deck.all.remove_damage(game, 1)
+            game.villain_deck.all.remove_influence(game, 1)
+        elif die_result == constants.CONTROL:
+            game.log(f"Rolled {constants.CONTROL}, add 1{constants.CONTROL}")
+            game.locations.add_control(game)
+        elif die_result == constants.DAMAGE:
+            game.log(f"Rolled {constants.DAMAGE}, ALL heroes lose 1{constants.HEART}")
+            game.heroes.all_heroes.remove_hearts(game, 1)
+        elif die_result == constants.CARD or die_result == constants.CARD + constants.CARD:
+            game.log(f"Rolled {constants.CARD}, ALL heroes discard a card")
+            game.heroes.all_heroes.choose_and_discard(game)
+
+
 monster_box_three_cards = [
+    CentaurAttack(),
+    CentaurAttack(),
+    FightAndFlight(),
+    AcromantulaAttack(),
+    AcromantulaAttack(),
+    SeriouslyMisunderstoodCreatures(),
+    SeriouslyMisunderstoodCreatures(),
+    Bombarda(),
 ]
 
 monster_box_four_cards = [

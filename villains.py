@@ -833,7 +833,7 @@ class GameSixVoldemort(Villain):
     def _effect(self, game):
         faces = [constants.DAMAGE, constants.DAMAGE, constants.DAMAGE, constants.INFLUENCE, constants.HEART, constants.CARD]
         die_result = random.choice(faces)
-        if game.heroes.active_hero._proficiency.can_reroll_house_dice and game.input(f"Rolled {die_result}, (a)ccept or (r)eroll? ", "ar") == "r":
+        if game.heroes.active_hero.can_reroll_die(house_die=True) and game.input(f"Rolled {die_result}, (a)ccept or (r)eroll? ", "ar") == "r":
             die_result = random.choice(faces)
         if die_result == constants.DAMAGE:
             game.log(f"Rolled {constants.DAMAGE}, ALL heroes lose 1{constants.HEART}")
@@ -1013,6 +1013,8 @@ class Boggart(Creature):
     def _effect(self, game):
         faces = [constants.HEART, constants.HEART + constants.HEART, constants.CARD, constants.CARD + constants.CARD, constants.DAMAGE, constants.CONTROL]
         die_result = random.choice(faces)
+        if game.heroes.active_hero.can_reroll_die(house_die=False) and game.input(f"Rolled {die_result}, (a)ccept or (r)eroll? ", "ar") == "r":
+            die_result = random.choice(faces)
         if die_result == constants.HEART:
             game.log(f"Rolled {constants.HEART}, ALL Creatures heal 1{constants.DAMAGE} and/or {constants.INFLUENCE}")
             game.villain_deck.all_creatures.remove_damage(game, 1)
@@ -1143,6 +1145,142 @@ class Scabbers(VillainCreature):
         hero._hand.append(card)
 
 VILLAINS_BY_NAME["Scabbers"] = Scabbers
+
+
+class Aragog(Creature):
+    def __init__(self):
+        super().__init__(
+                "Aragog",
+                f"Active hero loses 1{constants.HEART} for each Creature",
+                f"ALL heroes gain 1{constants.INFLUENCE} and 2{constants.HEART}; remove 1{constants.CONTROL}",
+                hearts=8)
+
+    def _effect(self, game):
+        total = sum(1 for card in game.villain_deck.current if card.is_creature)
+        game.log(f"Aragog: {total} Creatures in play")
+        game.heroes.active_hero.remove_hearts(game, total)
+
+    def _reward(self, game):
+        game.heroes.all_heroes.add(game, influence=1, hearts=2)
+        game.locations.remove_control(game)
+
+VILLAINS_BY_NAME["Aragog"] = Aragog
+
+
+class Centaur(Creature):
+    def __init__(self):
+        super().__init__(
+                "Centaur",
+                f"Active heroe discards a spell or loses 2{constants.HEART}",
+                f"ALL heroes may take a Spell from discard; remove 1{constants.CONTROL}",
+                cost=7)
+
+    def _effect(self, game):
+        hero = game.heroes.active_hero
+        spells = sum(1 for card in hero._hand if card.is_spell())
+        if hero.is_stunned:
+            game.log(f"{hero.name} is stunned and can't lose {constants.HEART}. Ignoring {self.name}!")
+            return
+        if spells == 0:
+            game.log(f"{hero.name} has no spells to discard, losing 2{constants.HEART}")
+            hero.remove_hearts(game, 2)
+            return
+        while True:
+            choices = ['h'] + [str(i) for i in range(len(hero._hand))]
+            choice = game.input(f"Choose a spell for {hero.name} to discard or (h) to lose 2{constants.HEART}: ", choices)
+            if choice == 'h':
+                hero.remove_hearts(game, 2)
+                break
+            choice = int(choice)
+            card = hero._hand[choice]
+            if not card.is_spell():
+                game.log(f"{card.name} is not a spell!")
+                continue
+            hero.discard(game, choice)
+            break
+
+    def _reward(self, game):
+        game.locations.remove_control(game)
+        game.heroes.all_heroes.effect(game, self.__per_hero)
+
+    def __per_hero(self, game, hero):
+        cards = [card for card in hero._discard if card.is_spell()]
+        if len(cards) == 0:
+            game.log(f"{hero.name} has no Spells in discard")
+            return
+        if len(cards) == 1:
+            card = cards[0]
+            game.log(f"{hero.name} has only one Spells in discard, taking {card}")
+            hero._discard.remove(card)
+            hero._hand.append(card)
+            return
+        game.log(f"Spells in {hero.name}'s discard:")
+        for i, card in enumerate(cards):
+            game.log(f" {i}: {card}")
+        # TODO allow to skip?
+        choice = game.input(f"Choose a card for {hero.name} to take: ", range(len(cards)))
+        card = cards[int(choice)]
+        hero._discard.remove(card)
+        hero._hand.append(card)
+
+VILLAINS_BY_NAME["Centaur"] = Centaur
+
+
+class UkrainianIronbelly(Creature):
+    def __init__(self):
+        super().__init__(
+                "Ukrainian Ironbelly",
+                f"If active hero has an Ally and an Item, loses 3{constants.HEART}",
+                f"ALL heroes gain 2{constants.HEART}; remove 1{constants.CONTROL}",
+                hearts=8)
+
+    def _effect(self, game):
+        hero = game.heroes.active_hero
+        allies = sum(1 for card in hero._hand if card.is_ally())
+        items = sum(1 for card in hero._hand if card.is_item())
+        if hero.is_stunned:
+            game.log(f"{hero.name} is stunned and can't lose {constants.HEART}. Ignoring {self.name}!")
+            return
+        game.log(f"{hero.name} has {allies} Allies and {items} Items in hand")
+        if allies >= 1 and items >= 1:
+            hero.remove_hearts(game, 3)
+
+    def _reward(self, game):
+        game.heroes.all_heroes.add(game, hearts=2)
+        game.locations.remove_control(game)
+
+VILLAINS_BY_NAME["Ukrainian Ironbelly"] = UkrainianIronbelly
+
+
+class Grawp(Creature):
+    def __init__(self):
+        super().__init__(
+                "Grawp",
+                f"If active hero has >=6{constants.CARD}, loses 2{constants.HEART}",
+                f"ALL heroes draw 2{constants.CARD} then discard 1{constants.CARD}",
+                hearts=8)
+
+    def _effect(self, game):
+        hero = game.heroes.active_hero
+        if hero.is_stunned:
+            game.log(f"{hero.name} is stunned and can't lose {constants.HEART}. Ignoring {self.name}!")
+            return
+        game.log(f"{hero.name} has {len(hero._hand)} cards in hand")
+        if len(hero._hand) >= 6:
+            hero.remove_hearts(game, 2)
+
+    def _reward(self, game):
+        game.heroes.all_heroes.effect(game, self.__per_hero)
+
+    def __per_hero(self, game, hero):
+        if hero.drawing_allowed:
+            hero.draw(game, 2)
+        elif game.input("Drawing not allowed, still discard? (y/n): ", "yn") == 'n':
+            return
+        # TODO: callbacks? It's technically an enemy, but it's not forced
+        hero.choose_and_discard(game, with_callbacks=False)
+
+VILLAINS_BY_NAME["Grawp"] = Grawp
 
 
 # Plus voldemort!

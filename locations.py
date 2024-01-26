@@ -235,6 +235,9 @@ monster_box_two_locations = [
 ]
 
 monster_box_three_locations = [
+    Location("Unicorn Hollow", 1, 5),
+    Location("Aragog's Lair", 2, 6),
+    Location("Giant Clearing", 3, 7),
 ]
 
 monster_box_four_locations = [

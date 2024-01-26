@@ -97,16 +97,16 @@ class Heroes(object):
     def previous_hero(self):
         return self._heroes[(self._current - 1) % len(self._heroes)]
 
-    def choose_hero(self, game, prompt="Choose a hero: ", disallow=None, disallow_msg="{} cannot be chosen!"):
+    def choose_hero(self, game, prompt="Choose a hero: ", optional=False, disallow=None):
         if len(self._heroes) == 1:
             return self._heroes[0]
 
-        while True:
-            chosen = self._heroes[int(game.input(prompt, range(len(self._heroes))))]
-            if chosen == disallow:
-                game.log(disallow_msg.format(disallow.name))
-                continue
-            return chosen
+        choices = ['c'] if optional else []
+        choices += [str(i) for i in range(len(self._heroes)) if self._heroes[i] != disallow]
+        choice = game.input(prompt, choices)
+        if choice == "c":
+            return None
+        return self._heroes[int(choice)]
 
     def choose_two_heroes(self, game, prompt="to eat pizza", disallow=None, disallow_msg="{} cannot be chosen!"):
         if len(self._heroes) <= 2:
@@ -366,6 +366,15 @@ class Hero(object):
         if self == game.heroes.active_hero:
             return True
         return self._gaining_out_of_turn_allowed
+
+    def can_reroll_die(self, house_die=True):
+        for e in self._encounters:
+            # TODO: this is a hack
+            if e.name == "Forbidden Forest":
+                return True
+        if house_die and self._proficiency.can_reroll_house_dice:
+            return True
+        return False
 
     def draw(self, game, count=1, end_of_turn=False):
         if not end_of_turn and not self.drawing_allowed:
@@ -760,7 +769,7 @@ class Hero(object):
                 game.input(f"{self.name} still has {len(self._hand)} cards in hand, end turn anyway? (y/n): ", "yn") != "y"):
             return False
         if (self._damage_tokens > 0 and
-                any(self._villain_can_take_damage(v) for v in game.villain_deck.all) and
+                any(self._villain_can_take_damage(game, v) for v in game.villain_deck.all) and
                 game.input(f"{self.name} still has {self._damage_tokens}{constants.DAMAGE}, end turn anyway? (y/n): ", "yn") != "y"):
             return False
         if (self._influence_tokens > 0 and
@@ -782,10 +791,12 @@ class Hero(object):
                 game.hogwarts_deck.empty_market_slot(game, choice.name)
         return True
 
-    def _villain_can_take_damage(self, villain):
+    def _villain_can_take_damage(self, game, villain):
         if villain._hearts == 0 or villain._damage == villain._hearts:
             return False
         if self._only_one_damage_per_villain and villain.is_villain and villain.took_damage:
+            return False
+        if villain == game.villain_deck._voldemort and not game.villain_deck.voldemort_vulnerable(game):
             return False
         return True
 

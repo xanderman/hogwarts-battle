@@ -206,7 +206,7 @@ class Game(object):
 
     def _roll_die(self, options, house_die=True):
         die_result = random.choice(options)
-        if house_die and self.heroes.active_hero._proficiency.can_reroll_house_dice and self.input(f"Rolled {die_result}, (a)ccept or (r)eroll?", "ar") == "r":
+        if self.heroes.active_hero.can_reroll_die(house_die=house_die) and self.input(f"Rolled {die_result}, (a)ccept or (r)eroll?", "ar") == "r":
             die_result = random.choice(options)
         if (self.encounters is not None
             and self.encounters.current.die_roll_applies(self, die_result)
