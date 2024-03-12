@@ -881,7 +881,7 @@ class FilthyHalfBreed(Encounter):
             window.addstr(f" {len(self._played_costs)}/3", curses.A_BOLD)
 
     def effect(self, game):
-        spells = sum(1 for slot in game.hogwarts_deck._market.values() if slot[0].is_spell)
+        spells = sum(1 for slot in game.hogwarts_deck._market.values() if slot[0].is_spell())
         if spells >= 2:
             game.log(f"{self.name}: {spells} spells in market! {game.heroes.active_hero.name} loses 1{constants.HEART}")
             game.heroes.active_hero.remove_hearts(game)
