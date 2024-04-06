@@ -319,7 +319,8 @@ class Tarantallegra(DarkArtsCard):
     def _effect(self, game):
         hero = game.heroes.active_hero
         hero.remove_hearts(game, 1)
-        hero.allow_only_one_damage_per_villain(game)
+        for villain in game.villain_deck.all_villains:
+            villain._max_damage_per_turn = 1
 
 
 game_three_cards = [
@@ -746,7 +747,35 @@ monster_box_three_cards = [
     Bombarda(),
 ]
 
+
+class DragonsBreath(DarkArtsCard):
+    def __init__(self):
+        super().__init__(
+            "Dragon's Breath",
+            f"Active Hero loses 1{constants.HEART} and discards ALL Items")
+
+    def _effect(self, game):
+        game.heroes.active_hero.remove_hearts(game, 1)
+        game.heroes.active_hero.discard_all_items(game)
+
+
+class LeprechaunGold(DarkArtsCard):
+    def __init__(self):
+        super().__init__(
+            "Leprechaun Gold",
+            f"ALL Heroes discard any {constants.DAMAGE} and {constants.INFLUENCE}")
+
+    def _effect(self, game):
+        game.heroes.all_heroes.remove_all_damage(game)
+        game.heroes.all_heroes.remove_all_influence(game)
+
+
 monster_box_four_cards = [
+    DragonsBreath(),
+    IngquisitorialSquad(),
+    LeprechaunGold(),
+    LeprechaunGold(),
+    LeprechaunGold(),
 ]
 
 MONSTER_BOX_CARDS = [

@@ -54,6 +54,8 @@ class Game(object):
         self._log_pad = curses.newpad(1000, 1000)
         self._log_pad.scrollok(True)
 
+        if self.encounters is not None:
+            self.encounters._current.on_reveal(self)
         self.villain_deck.reveal(self)
         self.hogwarts_deck.refill_market(self)
         self._active_hero = 0

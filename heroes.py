@@ -2,6 +2,7 @@ from collections import namedtuple
 from enum import Enum, auto
 
 import curses
+import inspect
 import random
 
 import constants
@@ -199,7 +200,9 @@ class HeroList(list):
                 getattr(hero, attr)(game, *args, **kwargs)
         return f
 
-    def effect(self, game, effect=lambda game, hero: None):
+    def effect(self, game, effect=None):
+        if effect is None:
+            raise ValueError("Effect cannot be None!")
         for hero in self:
             effect(game, hero)
 
@@ -228,10 +231,10 @@ class Hero(object):
         self._drawing_disallowed = 0
         self._healing_disallowed = 0
         self._gaining_out_of_turn_allowed = True
+        self._gaining_from_allies_allowed = True
         self._can_put_allies_in_deck = False
         self._can_put_items_in_deck = False
         self._can_put_spells_in_deck = False
-        self._only_one_damage_per_villain = False
         self._only_draw_four_cards = False
         self._extra_villain_rewards = []
         self._extra_creature_rewards = []
@@ -367,6 +370,12 @@ class Hero(object):
             return True
         return self._gaining_out_of_turn_allowed
 
+    def disallow_gaining_tokens_from_allies(self, game):
+        self._gaining_from_allies_allowed = False
+
+    def allow_gaining_tokens_from_allies(self, game):
+        self._gaining_from_allies_allowed = True
+
     def can_reroll_die(self, house_die=True):
         for e in self._encounters:
             # TODO: this is a hack
@@ -434,6 +443,13 @@ class Hero(object):
             discarded.append(self.discard(game, choice, with_callbacks))
         return discarded
 
+    def discard_all_items(self, game, with_callbacks=True):
+        discarded = []
+        for i, card in enumerate(self._hand):
+            if card.is_item():
+                discarded.append(self.discard(game, i, with_callbacks))
+        return discarded
+
     def choose_and_banish(self, game, desc="card", hand_only=False, optional=True, filter=lambda card: True):
         choices = ['c'] if optional else []
         choices += [str(i) for i in range(len(self._hand)) if filter(self._hand[i])]
@@ -496,9 +512,6 @@ class Hero(object):
 
     def can_put_spells_in_deck(self, game):
         self._can_put_spells_in_deck = True
-
-    def allow_only_one_damage_per_villain(self, game):
-        self._only_one_damage_per_villain = True
 
     @property
     def only_draw_four_cards(self):
@@ -597,15 +610,34 @@ class Hero(object):
             self.play_card(game, int(choice))
 
     def add_damage(self, game, amount=1):
-        if amount > 0 and game.heroes.active_hero != self and not self.gaining_tokens_allowed(game):
+        if amount > 0 and not self.gaining_tokens_allowed(game):
             game.log(f"{self.name}: gaining {constants.DAMAGE} on other heroes' turns not allowed!")
             return
+
+        # TODO: this should apply to second-order effects, like dice rolls, as well
+        call_stack = inspect.stack()
+        source = call_stack[1]
+        if source.function == "remove_damage" or source.function == "add":
+            source = call_stack[2]
+        if source.function == "f":
+            source = call_stack[3]
+        try:
+            source_is_ally = source.frame.f_locals['self'].is_ally()
+        except AttributeError:
+            source_is_ally = False
+        if amount > 0 and source_is_ally and not self._gaining_from_allies_allowed:
+            game.log(f"{self.name}: cannot gain {constants.DAMAGE} from Allies!")
+            return
+
         self._damage_tokens += amount
         if self._damage_tokens < 0:
             self._damage_tokens = 0
 
     def remove_damage(self, game, amount=1):
         self.add_damage(game, -amount)
+
+    def remove_all_damage(self, game):
+        self._damage_tokens = 0
 
     def assign_damage(self, game):
         if self._damage_tokens == 0:
@@ -622,11 +654,8 @@ class Hero(object):
             game.log("Voldemort is not vulnerable!")
             return None
         villain = game.villain_deck[choice]
-        if villain._hearts == 0 or villain._damage == villain._hearts:
+        if not villain.can_take_damage(game):
             game.log(f"{villain.name} cannot be assigned {constants.DAMAGE}!")
-            return None
-        if self._only_one_damage_per_villain and villain.is_villain and villain.took_damage:
-            game.log(f"{villain.name} has already been assigned {constants.DAMAGE}!")
             return None
         self.remove_damage(game)
         defeated = villain.add_damage(game)
@@ -659,11 +688,8 @@ class Hero(object):
             game.log("Voldemort is not vulnerable!")
             return None
         villain = game.villain_deck[choice]
-        if villain._cost == 0 or villain._influence == villain._cost:
+        if not villain.can_take_influence(game):
             game.log(f"{villain.name} cannot be assigned {constants.INFLUENCE}!")
-            return None
-        if villain.took_influence:
-            game.log(f"{villain.name} has already been assigned {constants.INFLUENCE}!")
             return None
         self.remove_influence(game)
         defeated = villain.add_influence(game)
@@ -682,15 +708,34 @@ class Hero(object):
         return villain
 
     def add_influence(self, game, amount=1):
-        if amount > 0 and game.heroes.active_hero != self and not self.gaining_tokens_allowed(game):
+        if amount > 0 and not self.gaining_tokens_allowed(game):
             game.log(f"{self.name}: gaining {constants.INFLUENCE} on other heroes' turns not allowed!")
             return
+
+        # TODO: this should apply to second-order effects, like dice rolls, as well
+        call_stack = inspect.stack()
+        source = call_stack[1]
+        if source.function == "remove_influence" or source.function == "add":
+            source = call_stack[2]
+        if source.function == "f":
+            source = call_stack[3]
+        try:
+            source_is_ally = source.frame.f_locals['self'].is_ally()
+        except AttributeError:
+            source_is_ally = False
+        if amount > 0 and source_is_ally and not self._gaining_from_allies_allowed:
+            game.log(f"{self.name}: cannot gain {constants.INFLUENCE} from Allies!")
+            return
+
         self._influence_tokens += amount
         if self._influence_tokens < 0:
             self._influence_tokens = 0
 
     def remove_influence(self, game, amount=1):
         self.add_influence(game, -amount)
+
+    def remove_all_influence(self, game):
+        self._influence_tokens = 0
 
     def add(self, game, damage=0, influence=0, hearts=0, cards=0):
         self.add_damage(game, damage)
@@ -769,12 +814,12 @@ class Hero(object):
                 game.input(f"{self.name} still has {len(self._hand)} cards in hand, end turn anyway? (y/n): ", "yn") != "y"):
             return False
         if (self._damage_tokens > 0 and
-                any(self._villain_can_take_damage(game, v) for v in game.villain_deck.all) and
+                any(v.can_take_damage(game) for v in game.villain_deck.all) and
                 game.input(f"{self.name} still has {self._damage_tokens}{constants.DAMAGE}, end turn anyway? (y/n): ", "yn") != "y"):
             return False
         if (self._influence_tokens > 0 and
                 (any(c[0].cost <= self._influence_tokens for c in game.hogwarts_deck._market.values())
-                    or any(self._villain_can_take_influence(v) for v in game.villain_deck.all)) and
+                    or any(v.can_take_influence(game) for v in game.villain_deck.all)) and
                 game.input(f"{self.name} still has {self._influence_tokens}{constants.INFLUENCE}, end turn anyway? (y/n): ", "yn") != "y"):
             return False
         if self._cards_acquired == 0 and len(game.hogwarts_deck._market) >= 0:
@@ -791,22 +836,6 @@ class Hero(object):
                 game.hogwarts_deck.empty_market_slot(game, choice.name)
         return True
 
-    def _villain_can_take_damage(self, game, villain):
-        if villain._hearts == 0 or villain._damage == villain._hearts:
-            return False
-        if self._only_one_damage_per_villain and villain.is_villain and villain.took_damage:
-            return False
-        if villain == game.villain_deck._voldemort and not game.villain_deck.voldemort_vulnerable(game):
-            return False
-        return True
-
-    def _villain_can_take_influence(self, villain):
-        if villain._cost == 0 or villain._influence == villain._cost:
-            return False
-        if villain.took_influence:
-            return False
-        return True
-
     def end_turn(self, game):
         self._discard += self._hand + self._play_area
         self._hand = []
@@ -817,7 +846,6 @@ class Hero(object):
         self._can_put_allies_in_deck = False
         self._can_put_items_in_deck = False
         self._can_put_spells_in_deck = False
-        self._only_one_damage_per_villain = False
         self._extra_villain_rewards = []
         self._extra_creature_rewards = []
         self._extra_card_effects = []
@@ -911,7 +939,10 @@ class StarterBroom(hogwarts.Item):
 
     def _effect(self, game):
         game.heroes.active_hero.add_damage(game)
-        game.heroes.active_hero.add_extra_villain_reward(game, lambda game: game.heroes.active_hero.add_influence(game))
+        game.heroes.active_hero.add_extra_villain_reward(game, self.__villain_reward)
+
+    def __villain_reward(self, game):
+        game.heroes.active_hero.add_influence(game)
 
 
 class InvisibilityCloak(hogwarts.Item):

@@ -240,7 +240,15 @@ monster_box_three_locations = [
     Location("Giant Clearing", 3, 7),
 ]
 
+def triwizard_maze_effect(game):
+    game.villain_deck.all_creatures.remove_damage(game, 1)
+    game.villain_deck.all_creatures.remove_influence(game, 1)
+
 monster_box_four_locations = [
+    Location("Selection of Champions", 1, 5),
+    Location("Dragon Arena", 2, 6),
+    Location("Mermaid Village", 2, 6),
+    Location("Triwizard Maze", 3, 7, f"Remove 1{constants.DAMAGE} and 1{constants.INFLUENCE} from ALL Creatures", triwizard_maze_effect),
 ]
 
 MONSTER_BOX_LOCATIONS = [

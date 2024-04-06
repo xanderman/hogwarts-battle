@@ -165,10 +165,12 @@ class Diary(Horcrux):
             window.addstr(" ✔", curses.A_BOLD | curses.color_pair(1))
 
     def die_roll_applies(self, game, result):
-        return (result == constants.HEART or result == f"{constants.CARD}") and not self.completed
+        if self.completed:
+            return False
+        return result == constants.HEART or result == (constants.HEART + constants.HEART) or result == f"{constants.CARD}"
 
     def apply_die_roll(self, game, result):
-        if not (result == constants.HEART or result == constants.CARD):
+        if not self.die_roll_applies(game, result):
             raise ValueError(f"Programmer Error! Diary only applies to {constants.HEART} or {constants.CARD}")
         self.completed = True
 
@@ -223,7 +225,7 @@ class Ring(Horcrux):
         game.heroes.active_hero.add_extra_damage_effect(game, self.__extra_effect)
 
     def __extra_effect(self, game, villain, damage):
-        if self.completed:
+        if self.completed or not villain.is_villain():
             return
         self._damaged_villains[villain] += damage
         if self._damaged_villains[villain] >= 2 and villain not in self._used_ability:
@@ -284,16 +286,19 @@ class Locket(Horcrux):
             window.addstr("✔", curses.A_BOLD | curses.color_pair(1))
 
     def die_roll_applies(self, game, result):
+        if self.completed:
+            return False
         return ((result == constants.DAMAGE and not self._got_damage) or
-                (result == constants.HEART and not self._got_heart)) and not self.completed
+                (result == constants.HEART and not self._got_heart) or
+                (result == (constants.HEART + constants.HEART) and not self._got_heart))
 
     def apply_die_roll(self, game, result):
+        if not self.die_roll_applies(game, result):
+            raise ValueError(f"Programmer Error! Locket only applies to {constants.DAMAGE} or {constants.HEART}")
         if result == constants.DAMAGE:
             self._got_damage = True
-        elif result == constants.HEART:
-            self._got_heart = True
         else:
-            raise ValueError(f"Programmer Error! Locket only applies to {constants.DAMAGE} or {constants.HEART}")
+            self._got_heart = True
         if self._got_damage and self._got_heart:
             game.heroes.all_heroes.allow_gaining_tokens_out_of_turn(game)
             self.completed = True
@@ -340,16 +345,19 @@ class Cup(Horcrux):
             window.addstr("✔", curses.A_BOLD | curses.color_pair(1))
 
     def die_roll_applies(self, game, result):
+        if self.completed:
+            return False
         return ((result == constants.HEART and not self._got_heart) or
-                (result == constants.INFLUENCE and not self._got_influence)) and not self.completed
+                (result == (constants.HEART + constants.HEART) and not self._got_heart) or
+                (result == constants.INFLUENCE and not self._got_influence))
 
     def apply_die_roll(self, game, result):
-        if result == constants.HEART:
-            self._got_heart = True
-        elif result == constants.INFLUENCE:
+        if not self.die_roll_applies(game, result):
+            raise ValueError(f"Programmer Error! Cup only applies to {constants.HEART} or {constants.INFLUENCE}")
+        if result == constants.INFLUENCE:
             self._got_influence = True
         else:
-            raise ValueError(f"Programmer Error! Cup only applies to {constants.HEART} or {constants.INFLUENCE}")
+            self._got_heart = True
         if self._got_heart and self._got_influence:
             self.completed = True
 
@@ -458,19 +466,22 @@ class Nagini(Horcrux):
             window.addstr("✔", curses.A_BOLD | curses.color_pair(1))
 
     def die_roll_applies(self, game, result):
+        if self.completed:
+            return False
         return ((result == constants.DAMAGE and not self._got_damage) or
                 (result == constants.CARD and not self._got_card) or
-                (result == constants.HEART and not self._got_heart)) and not self.completed
+                (result == constants.HEART and not self._got_heart) or
+                (result == (constants.HEART + constants.HEART) and not self._got_heart))
 
     def apply_die_roll(self, game, result):
+        if not self.die_roll_applies(game, result):
+            raise ValueError(f"Programmer Error! Nagini only applies to {constants.DAMAGE} or {constants.CARD} or {constants.HEART}")
         if result == constants.DAMAGE:
             self._got_damage = True
         elif result == constants.CARD:
             self._got_card = True
-        elif result == constants.HEART:
-            self._got_heart = True
         else:
-            raise ValueError(f"Programmer Error! Nagini only applies to {constants.DAMAGE} or {constants.CARD} or {constants.HEART}")
+            self._got_heart = True
         if self._got_damage and self._got_card and self._got_heart:
             self.completed = True
 
@@ -563,16 +574,19 @@ class StudentsOutOfBed(Encounter):
             window.addstr("✔", curses.A_BOLD | curses.color_pair(1))
 
     def die_roll_applies(self, game, result):
-        return ((result == constants.HEART and not self._got_heart) or
-                (result == constants.CARD and not self._got_card)) and not self.completed
+        if self.completed:
+            return False
+        return ((result == constants.CARD and not self._got_card) or
+                (result == constants.HEART and not self._got_heart) or
+                (result == (constants.HEART + constants.HEART) and not self._got_heart))
 
     def apply_die_roll(self, game, result):
-        if result == constants.HEART:
-            self._got_heart = True
-        elif result == constants.CARD:
+        if not self.die_roll_applies(game, result):
+            raise ValueError(f"Programmer Error! Students Out of Bed only applies to {constants.HEART} or {constants.CARD}")
+        if result == constants.CARD:
             self._got_card = True
         else:
-            raise ValueError(f"Programmer Error! Students Out of Bed only applies to {constants.HEART} or {constants.CARD}")
+            self._got_heart = True
         if self._got_heart and self._got_card:
             self.completed = True
             game.heroes.all_heroes.remove_extra_shuffle_effect(game, self.__extra_effect)
@@ -837,19 +851,22 @@ class ForbiddenForest(Encounter):
             window.addstr("✔", curses.A_BOLD | curses.color_pair(1))
 
     def die_roll_applies(self, game, result):
+        if self.completed:
+            return False
         return ((result == constants.CARD and not self._got_card) or
+                (result == constants.INFLUENCE and not self._got_influence) or
                 (result == constants.HEART and not self._got_heart) or
-                (result == constants.INFLUENCE and not self._got_influence)) and not self.completed
+                (result == (constants.HEART + constants.HEART) and not self._got_heart))
 
     def apply_die_roll(self, game, result):
+        if not self.die_roll_applies(game, result):
+            raise ValueError(f"Programmer Error! Nagini only applies to {constants.CARD} or {constants.HEART} or {constants.INFLUENCE}")
         if result == constants.CARD:
             self._got_card = True
-        elif result == constants.HEART:
-            self._got_heart = True
         elif result == constants.INFLUENCE:
             self._got_influence = True
         else:
-            raise ValueError(f"Programmer Error! Nagini only applies to {constants.CARD} or {constants.HEART} or {constants.INFLUENCE}")
+            self._got_heart = True
         if self._got_card and self._got_heart and self._got_influence:
             self.completed = True
 
@@ -874,7 +891,6 @@ class FilthyHalfBreed(Encounter):
 
     def _display_to_complete(self, window):
         window.addstr(f"Play 3{constants.CARD} with different {constants.INFLUENCE} cost in one turn")
-        window.addstr(f"roll {constants.DAMAGE}")
         if self.completed:
             window.addstr(" ✔", curses.A_BOLD | curses.color_pair(1))
         else:
@@ -954,5 +970,169 @@ monster_box_three_encounters = [
     Escape,
 ]
 
+
+class TheFirstTask(Encounter):
+    def __init__(self):
+        super().__init__(
+            "The First Task",
+            f"If you assign 2{constants.DAMAGE} to a foe, lose 2{constants.HEART}",
+            f"1/game: discard this; roll any two House dice",
+            ["Chinese Fireball", "Common Welsh Green", "Hungarian Horntail", "Swedish Short-Snout"])
+        self._influence_spent = 0
+        self._damaged_foes = Counter()
+        self._used_ability = set()
+
+    def _display_to_complete(self, window):
+        window.addstr(f"Acquire Items with total cost >= 7{constants.INFLUENCE} in one turn")
+        if self.completed:
+            window.addstr(" ✔", curses.A_BOLD | curses.color_pair(1))
+        else:
+            window.addstr(f" {self._influence_spent}/7", curses.A_BOLD)
+
+    def on_reveal(self, game):
+        game.heroes.add_acquire_callback(game, self)
+
+    def acquire_callback(self, game, hero, card):
+        if card.is_item():
+            self._influence_spent += card.cost
+        if self._influence_spent >= 7:
+            self.completed = True
+            game.heroes.remove_acquire_callback(game, self)
+
+    def effect(self, game):
+        self._damaged_foes = Counter()
+        self._used_ability = set()
+        game.heroes.active_hero.add_extra_damage_effect(game, self.__extra_effect)
+        self._influence_spent = 0
+
+    def __extra_effect(self, game, villain, damage):
+        if self.completed:
+            return
+        self._damaged_foes[villain] += damage
+        if self._damaged_foes[villain] >= 2 and villain not in self._used_ability:
+            self._used_ability.add(villain)
+            game.log(f"{self.name}: {game.heroes.active_hero.name} assigned 2{constants.DAMAGE} to {villain.name}, loses 2{constants.HEART}")
+            game.heroes.active_hero.remove_hearts(game, 2)
+
+    def reward_effect(self, game):
+        game.heroes.active_hero.add_action(game, 'F', "(F)irst Task", self.__reward_action)
+
+    def __reward_action(self, game):
+        game.log(f"{self.name} discarded; roll any two House dice")
+        game.heroes.active_hero._encounters.remove(self)
+        game.heroes.active_hero.remove_action(game, 'F')
+        choice = game.input("Choose first die to roll (Gryffindor, Hufflepuff, Ravenclaw, Slytherin): ", ["G", "H", "R", "S"])
+        if choice == "G":
+            game.roll_gryffindor_die()
+        elif choice == "H":
+            game.roll_hufflepuff_die()
+        elif choice == "R":
+            game.roll_ravenclaw_die()
+        elif choice == "S":
+            game.roll_slytherin_die()
+        choice = game.input("Choose second die to roll (Gryffindor, Hufflepuff, Ravenclaw, Slytherin): ", ["G", "H", "R", "S"])
+        if choice == "G":
+            game.roll_gryffindor_die()
+        elif choice == "H":
+            game.roll_hufflepuff_die()
+        elif choice == "R":
+            game.roll_ravenclaw_die()
+        elif choice == "S":
+            game.roll_slytherin_die()
+
+
+class TheSecondTask(Encounter):
+    def __init__(self):
+        super().__init__(
+            "The Second Task",
+            f"If you don't have an Ally, add 1{constants.CONTROL}",
+            f"1/game: discard this; remove 1{constants.CONTROL}, ALL Heroes draw a card",
+            ["Mermaid", "Grindylow"])
+        self._allies_acquired = 0
+
+    def _display_to_complete(self, window):
+        window.addstr(f"Acquire 2 Allies in one turn")
+        if self.completed:
+            window.addstr(" ✔", curses.A_BOLD | curses.color_pair(1))
+        else:
+            window.addstr(f" {self._allies_acquired}/2", curses.A_BOLD)
+
+    def on_reveal(self, game):
+        game.heroes.add_acquire_callback(game, self)
+
+    def acquire_callback(self, game, hero, card):
+        if card.is_ally():
+            self._allies_acquired += 1
+            if self._allies_acquired >= 2:
+                self.completed = True
+                game.heroes.remove_acquire_callback(game, self)
+
+    def effect(self, game):
+        self._allies_acquired = 0
+        hero = game.heroes.active_hero
+        allies = sum(1 for card in hero._hand if card.is_ally())
+        if allies == 0:
+            game.log(f"{self.name}: {game.heroes.active_hero.name} doesn't have an Ally, adding 1{constants.CONTROL}")
+            game.locations.add_control(game)
+
+    def reward_effect(self, game):
+        game.heroes.active_hero.add_action(game, 'S', "(S)econd Task", self.__reward_action)
+
+    def __reward_action(self, game):
+        game.log(f"{self.name} discarded; remove 1{constants.CONTROL}, ALL Heroes draw a card")
+        game.heroes.active_hero._encounters.remove(self)
+        game.heroes.active_hero.remove_action(game, 'S')
+        game.locations.remove_control(game)
+        game.heroes.all_heroes.draw(game)
+
+
+class TheThirdTask(Encounter):
+    def __init__(self):
+        super().__init__(
+            "The Third Task",
+            f"Lose 2{constants.HEART}",
+            f"1/game: discard this; ALL Heroes heal to full",
+            [])
+        self._got_heart = 0
+
+    def _display_to_complete(self, window):
+        window.addstr(f"roll 3{constants.HEART}")
+        if self.completed:
+            window.addstr(" ✔", curses.A_BOLD | curses.color_pair(1))
+        else:
+            window.addstr(f" {self._got_heart}/3", curses.A_BOLD)
+
+    def die_roll_applies(self, game, result):
+        if self.completed:
+            return False
+        return result == constants.HEART or result == (constants.HEART + constants.HEART)
+
+    def apply_die_roll(self, game, result):
+        if result == constants.HEART:
+            self._got_heart += 1
+        elif result == (constants.HEART + constants.HEART):
+            self._got_heart += 2
+        else:
+            raise ValueError(f"Programmer Error! The Third Task only applies to {constants.HEART}")
+        if self._got_heart >= 3:
+            self.completed = True
+
+    def effect(self, game):
+        game.heroes.active_hero.remove_hearts(game, 2)
+
+    def reward_effect(self, game):
+        game.heroes.active_hero.add_action(game, 'T', "(T)hird Task", self.__reward_action)
+
+    def __reward_action(self, game):
+        game.log(f"{self.name} discarded; remove 1{constants.CONTROL}, ALL Heroes gain 2{constants.INFLUENCE}")
+        game.heroes.active_hero._encounters.remove(self)
+        game.heroes.active_hero.remove_action(game, 'T')
+        game.locations.remove_control(game)
+        game.heroes.all_heroes.add_influence(game, 2)
+
+
 monster_box_four_encounters = [
+    TheFirstTask,
+    TheSecondTask,
+    TheThirdTask,
 ]

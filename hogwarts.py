@@ -360,7 +360,10 @@ class Nimbus2001(Item):
 
     def _effect(self, game):
         game.heroes.active_hero.add(game, damage=2)
-        game.heroes.active_hero.add_extra_villain_reward(game, lambda game: game.heroes.active_hero.add_influence(game, 2))
+        game.heroes.active_hero.add_extra_villain_reward(game, self.__villain_reward)
+
+    def __villain_reward(self, game):
+        game.heroes.active_hero.add_influence(game, 2)
 
 
 class Fawkes(Ally):
@@ -695,7 +698,10 @@ class ViktorKrum(Ally):
 
     def _effect(self, game):
         game.heroes.active_hero.add_damage(game, 2)
-        game.heroes.active_hero.add_extra_villain_reward(game, lambda game: game.heroes.active_hero.add(game, influence=1, hearts=1))
+        game.heroes.active_hero.add_extra_villain_reward(game, self.__villain_reward)
+
+    def __villain_reward(self, game):
+        game.heroes.active_hero.add(game, influence=1, hearts=1)
 
 
 class MadEyeMoody(Ally):
@@ -1250,6 +1256,7 @@ class Depulso(Spell):
             3)
 
     def _effect(self, game):
+        # TODO: asks for banish even if no items in hand or discard
         choice = game.input(f"Choose effect: (i){constants.INFLUENCE}, (b)anish: ", "ib")
         if choice == "i":
             game.heroes.active_hero.add_influence(game, 2)
@@ -1379,7 +1386,114 @@ monster_box_three_cards = [
 ]
 
 
+class MadameMaxime(Ally):
+    def __init__(self):
+        super().__init__(
+            "Madame Maxime",
+            f"Gain 2{constants.DAMAGE}; ALL Heroes gain 2{constants.HEART}",
+            7)
+
+    def _effect(self, game):
+        game.heroes.active_hero.add_damage(game, 2)
+        game.heroes.all_heroes.add_hearts(game, 2)
+
+
+class IgorKarkaroff(Ally):
+    def __init__(self):
+        super().__init__(
+            "Igor Karkaroff",
+            f"Gain 2{constants.DAMAGE}; if you defeat a Villain, gain 1{constants.DAMAGE} and 1{constants.INFLUENCE}",
+            5)
+
+    def _effect(self, game):
+        game.heroes.active_hero.add(game, damage=2)
+        game.heroes.active_hero.add_extra_villain_reward(game, self.__villain_reward)
+
+    def __villain_reward(self, game):
+        game.heroes.active_hero.add(game, damage=1, influence=1)
+
+
+class GoldenEgg(Item):
+    def __init__(self):
+        super().__init__(
+            "Golden Egg",
+            f"Gain 2{constants.DAMAGE}, 1{constants.INFLUENCE}, and 1{constants.CARD}",
+            7)
+
+    def _effect(self, game):
+        game.heroes.active_hero.add(game, damage=2, influence=1, cards=1)
+
+
+class Gillyweed(Item):
+    def __init__(self):
+        super().__init__(
+            "Gillyweed",
+            f"Gain 1{constants.HEART}, for each Ally played one Hero gains 1{constants.HEART}",
+            1)
+
+    def _effect(self, game):
+        game.heroes.active_hero.add_hearts(game)
+        for card in game.heroes.active_hero._play_area:
+            if card.is_ally():
+                game.log(f"Ally {card.name} already played, gillyweed grants {constants.HEART}")
+                game.heroes.choose_hero(game, prompt=f"Choose hero to gain 1{constants.HEART}: ").add_hearts(game)
+        game.heroes.active_hero.add_extra_card_effect(game, self.__add_heart_if_ally)
+
+    def __add_heart_if_ally(self, game, card):
+        if card.is_ally():
+            game.log(f"Ally {card.name} played, gillyweed grants {constants.HEART}")
+            game.heroes.choose_hero(game, prompt=f"Choose hero to gain 1{constants.HEART}: ").add_hearts(game)
+
+
+class DragonsBlood(Item):
+    def __init__(self):
+        super().__init__(
+            "Dragon's Blood",
+            f"ALL Heroes gain 3{constants.HEART}; You may assign 1 additional {constants.INFLUENCE} to Creatures this turn",
+            5)
+
+    def _effect(self, game):
+        game.heroes.all_heroes.add_hearts(game, 3)
+        for creature in game.villain_deck.all_creatures:
+            creature._max_influence_per_turn += 1
+
+
+class PrioriIncantatem(Spell):
+    def __init__(self):
+        super().__init__(
+            "Priori Incantatem",
+            f"Choose a played Spell and gain its effect",
+            3)
+
+    def _effect(self, game):
+        played_spells = [card for card in game.heroes.active_hero._play_area if card.is_spell()]
+        if len(played_spells) == 0:
+            game.log("You haven't played any spells, priori incantatem wasted!")
+            return
+        if len(played_spells) == 1:
+            game.log(f"Only one spell played, copying {played_spells[0].name}")
+            played_spells[0]._effect(game)
+            return
+        while True:
+            choice = int(game.input("Choose played spell to polyjuice: ", range(len(game.heroes.active_hero._play_area))))
+            card = game.heroes.active_hero._play_area[choice]
+            if not card.is_spell():
+                game.log("{card.name} is not an spell!")
+                continue
+            game.log(f"Copying {card.name}")
+            card._effect(game)
+            break
+
+
 monster_box_four_cards = [
+    MadameMaxime(),
+    IgorKarkaroff(),
+    GoldenEgg(),
+    Gillyweed(),
+    Gillyweed(),
+    DragonsBlood(),
+    PrioriIncantatem(),
+    PrioriIncantatem(),
 ]
 
 

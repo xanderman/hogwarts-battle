@@ -68,6 +68,7 @@ class VillainDeck(object):
         voldemort_was_active = self.voldemort_active()
         while len(self.current) < self._max and len(self._deck) > 0:
             death_eaters = sum(1 for v in game.villain_deck.current if v.name == "Death Eater" and not v._stunned)
+            welsh_greens = sum(1 for v in game.villain_deck.current if v.name == "Common Welsh Green" and not v._stunned)
             villain = self._deck.pop()
             self.current.append(villain)
             game.log(f"Revealed {villain.type_name}: {villain.name}")
@@ -75,6 +76,9 @@ class VillainDeck(object):
             if death_eaters > 0 and villain.is_villain:
                 game.log(f"Death Eater (x{death_eaters}): Villain revealed, ALL heroes lose {death_eaters}{constants.HEART}")
                 game.heroes.all_heroes.remove_hearts(game, death_eaters)
+            if welsh_greens > 0 and villain.is_creature:
+                game.log(f"Common Welsh Green: Creature revealed, ALL heroes lose 2{constants.HEART}")
+                game.heroes.all_heroes.remove_hearts(game, 2)
         if self.voldemort_active() and not voldemort_was_active:
             game.log("Voldemort revealed!")
             self._voldemort._on_reveal(game)
@@ -159,7 +163,9 @@ class VillainList(list):
                 getattr(villain, attr)(game, *args, **kwargs)
         return f
 
-    def effect(self, game, effect=lambda game, villain: None):
+    def effect(self, game, effect=None):
+        if effect is None:
+            raise ValueError("Programmer Error! Forgot to pass effect to VillainList.effect")
         for villain in self:
             effect(game, villain)
 
@@ -179,7 +185,6 @@ def build_deck(game_num, encounters):
     names = set(encounters.required_villains())
     available = list(VILLAINS_BY_NAME.keys())
     while len(names) < total_villains:
-        # TODO: there are two Death Eaters
         names.add(random.choice(available))
     return [VILLAINS_BY_NAME[name]() for name in names]
 
@@ -194,8 +199,7 @@ def build_voldemort(game_num):
     if game_num == 7 or game_num == "m3":
         return GameSevenVoldemort()
     if game_num == "m4":
-        # TODO: add m4 voldemort
-        return None
+        return MonsterBoxFourVoldemort()
     return None
 
 
@@ -208,9 +212,11 @@ class Foe(object):
         self._cost = cost
 
         self._damage = 0
-        self.took_damage = False
+        self._took_damage = 0
+        self._max_damage_per_turn = 100
         self._influence = 0
-        self.took_influence = False
+        self._took_influence = 0
+        self._max_influence_per_turn = 1
         self._stunned = False
         self._stunned_by = None
 
@@ -251,8 +257,10 @@ class Foe(object):
         raise ValueError(f"Programmer Error! Forgot to implement effect for {self.name}")
 
     def end_turn(self, game):
-        self.took_damage = False
-        self.took_influence = False
+        self._took_damage = 0
+        self._max_damage_per_turn = 100
+        self._took_influence = 0
+        self._max_influence_per_turn = 1
 
     def __str__(self):
         return f"{self.name}: {self.description}"
@@ -269,10 +277,25 @@ class Foe(object):
     def type_name(self):
         return "ERROR! Forgot to override type_name in subclass!"
 
+    @property
+    def took_damage(self):
+        return self._took_damage > 0
+
+    def can_take_damage(self, game):
+        if self._hearts == 0:
+            return False
+        if self._damage >= self._hearts:
+            return False
+        if self._took_damage >= self._max_damage_per_turn:
+            return False
+        if self == game.villain_deck._voldemort and not game.villain_deck.voldemort_vulnerable(game):
+            return False
+        return True
+
     def add_damage(self, game):
         if self._hearts == 0:
             raise Exception(f"Prgammer Error! {self.name} cannot take damage!")
-        self.took_damage = True
+        self._took_damage += 1
         self._damage += 1
         if self._defeated:
             self._apply_defeat(game)
@@ -284,12 +307,27 @@ class Foe(object):
         if self._damage < 0:
             self._damage = 0
 
+    @property
+    def took_influence(self):
+        return self._took_influence > 0
+
+    def can_take_influence(self, game):
+        if self._cost == 0:
+            return False
+        if self._influence >= self._cost:
+            return False
+        if self._took_influence >= self._max_influence_per_turn:
+            return False
+        if self == game.villain_deck._voldemort and not game.villain_deck.voldemort_vulnerable(game):
+            return False
+        return True
+
     def add_influence(self, game):
         if self._cost == 0:
             raise Exception(f"Programmer Error! {self.name} cannot take influence!")
-        if self.took_influence:
-            raise Exception(f"Programmer Error! {self.name} cannot take influence twice!")
-        self.took_influence = True
+        if self._took_influence >= self._max_influence_per_turn:
+            raise Exception(f"Programmer Error! {self.name} cannot take more influence!")
+        self._took_influence += 1
         self._influence += 1
         if self._defeated:
             self._apply_defeat(game)
@@ -315,7 +353,6 @@ class Foe(object):
         if game.villain_deck._rewards_allowed:
             self.reward(game)
         else:
-            # TODO: rewards that remove callbacks need to be fixed
             game.log(f"{self.name} defeated, but rewards are not allowed!")
         if self == game.villain_deck._voldemort:
             game.villain_deck._voldemort = None
@@ -631,8 +668,10 @@ class PeterPettigrew(Villain):
         game.log(f"Spells in {hero.name}'s discard:")
         for i, spell in enumerate(spells):
             game.log(f" {i}: {spell}")
-        # TODO allow to skip?
-        choice = game.input(f"Choose a spell for {hero.name} to take: ", range(len(spells)))
+        choices = ['c'] + [str(i) for i in range(len(spells))]
+        choice = game.input(f"Choose a Spell for {hero.name} to take or (c)ancel: ", choices)
+        if choice == 'c':
+            return
         spell = spells[int(choice)]
         hero._discard.remove(spell)
         hero._hand.append(spell)
@@ -661,6 +700,7 @@ class DeathEater(Villain):
         game.locations.remove_control(game)
 
 VILLAINS_BY_NAME["Death Eater"] = DeathEater
+VILLAINS_BY_NAME["Death Eater 2"] = DeathEater
 
 
 class BartyCrouch(Villain):
@@ -777,8 +817,10 @@ class BellatrixLestrange(Villain):
         game.log(f"Items in {hero.name}'s discard:")
         for i, item in enumerate(items):
             game.log(f" {i}: {item}")
-        # TODO allow to skip?
-        choice = game.input(f"Choose an item for {hero.name} to take: ", range(len(items)))
+        choices = ['c'] + [str(i) for i in range(len(items))]
+        choice = game.input(f"Choose an Item for {hero.name} to take or (c)ancel: ", choices)
+        if choice == 'c':
+            return
         item = items[int(choice)]
         hero._discard.remove(item)
         hero._hand.append(item)
@@ -1138,8 +1180,10 @@ class Scabbers(VillainCreature):
         game.log(f"Cheap cards in {hero.name}'s discard:")
         for i, card in enumerate(cards):
             game.log(f" {i}: {card}")
-        # TODO allow to skip?
-        choice = game.input(f"Choose a card for {hero.name} to take: ", range(len(cards)))
+        choices = ['c'] + [str(i) for i in range(len(cards))]
+        choice = game.input(f"Choose a card for {hero.name} to take or (c)ancel: ", choices)
+        if choice == 'c':
+            return
         card = cards[int(choice)]
         hero._discard.remove(card)
         hero._hand.append(card)
@@ -1217,8 +1261,10 @@ class Centaur(Creature):
         game.log(f"Spells in {hero.name}'s discard:")
         for i, card in enumerate(cards):
             game.log(f" {i}: {card}")
-        # TODO allow to skip?
-        choice = game.input(f"Choose a card for {hero.name} to take: ", range(len(cards)))
+        choices = ['c'] + [str(i) for i in range(len(cards))]
+        choice = game.input(f"Choose a card for {hero.name} to take or (c)ancel: ", choices)
+        if choice == 'c':
+            return
         card = cards[int(choice)]
         hero._discard.remove(card)
         hero._hand.append(card)
@@ -1277,10 +1323,200 @@ class Grawp(Creature):
             hero.draw(game, 2)
         elif game.input("Drawing not allowed, still discard? (y/n): ", "yn") == 'n':
             return
-        # TODO: callbacks? It's technically an enemy, but it's not forced
+        # TODO: callbacks? It's technically an enemy, but it's a reward
         hero.choose_and_discard(game, with_callbacks=False)
 
 VILLAINS_BY_NAME["Grawp"] = Grawp
+
+
+class ChineseFireball(Creature):
+    def __init__(self):
+        super().__init__(
+                "Chinese Fireball",
+                "Reveal an additional Dark Arts event each turn",
+                f"Roll the creature die; remove 1{constants.CONTROL}",
+                cost=6)
+
+    def _effect(self, game):
+        game.dark_arts_deck.play(game, 1)
+
+    def _reward(self, game):
+        game.roll_creature_die()
+        game.locations.remove_control(game)
+
+VILLAINS_BY_NAME["Chinese Fireball"] = ChineseFireball
+
+
+class CommonWelshGreen(Creature):
+    def __init__(self):
+        super().__init__(
+                "Common Welsh Green",
+                f"When a new Creature is revealed, ALL Heroes lose 2{constants.HEART}",
+                f"ALL heroes gain 2{constants.INFLUENCE}",
+                hearts=8)
+
+    def _effect(self, game):
+        pass
+
+    def _reward(self, game):
+        game.heroes.all_heroes.add_influence(game, 2)
+
+VILLAINS_BY_NAME["Common Welsh Green"] = CommonWelshGreen
+
+
+class HungarianHorntail(Creature):
+    def __init__(self):
+        super().__init__(
+                "Hungarian Horntail",
+                f"Other Villains and Creatures may not be assigned {constants.DAMAGE}",
+                f"Roll the creature die; remove 1{constants.CONTROL}",
+                hearts=10)
+
+    def _effect(self, game):
+        for foe in game.villain_deck.current:
+            if foe is self:
+                continue
+            foe._max_damage_per_turn = 0
+
+    def _reward(self, game):
+        game.roll_creature_die()
+        game.locations.remove_control(game)
+
+VILLAINS_BY_NAME["Hungarian Horntail"] = HungarianHorntail
+
+
+class SwedishShortSnout(Creature):
+    def __init__(self):
+        super().__init__(
+                "Swedish Short-Snout",
+                f"Roll the Hufflepuff die",
+                f"Roll the Hufflepuff and Creature dice",
+                cost=6)
+
+    def _effect(self, game):
+        faces = [constants.INFLUENCE, constants.HEART, constants.HEART, constants.HEART, constants.CARD, constants.DAMAGE]
+        game.log("Rolling Hufflepuff die")
+        die_result = random.choice(faces)
+        if game.heroes.active_hero.can_reroll_die(house_die=True) and game.input(f"Rolled {die_result}, (a)ccept or (r)eroll? ", "ar") == "r":
+            die_result = random.choice(faces)
+        if die_result == constants.HEART:
+            game.log(f"Rolled {constants.HEART}, ALL Creatures heal 1{constants.DAMAGE}")
+            game.villain_deck.all_creatures.remove_damage(game, 1)
+        elif die_result == constants.INFLUENCE:
+            game.log(f"Rolled {constants.INFLUENCE}, ALL Creatures heal 1{constants.INFLUENCE}")
+            game.villain_deck.all_creatures.remove_influence(game, 1)
+        elif die_result == constants.DAMAGE:
+            game.log(f"Rolled {constants.DAMAGE}, ALL heroes lose 1{constants.HEART}")
+            game.heroes.all_heroes.remove_hearts(game, 1)
+        elif die_result == constants.CARD:
+            game.log(f"Rolled {constants.CARD}, ALL Heroes add Detention! to hand")
+            game.heroes.all_heroes.add_detention(game, to_hand=True)
+
+    def _reward(self, game):
+        game.roll_hufflepuff_die()
+        game.roll_creature_die()
+
+VILLAINS_BY_NAME["Swedish Short-Snout"] = SwedishShortSnout
+
+
+class Grindylow(Creature):
+    def __init__(self):
+        super().__init__(
+                "Grindylow",
+                f"If active Hero has >=2 Allies, add {constants.CONTROL}",
+                f"Remove 1{constants.CONTROL}",
+                hearts=6)
+
+    def _effect(self, game):
+        hero = game.heroes.active_hero
+        allies = sum(1 for card in hero._hand if card.is_ally())
+        game.log(f"{hero.name} has {allies} Allies in hand")
+        if allies >= 2:
+            game.locations.add_control(game)
+
+    def _reward(self, game):
+        game.locations.remove_control(game)
+
+VILLAINS_BY_NAME["Grindylow"] = Grindylow
+
+
+class Mermaid(Creature):
+    def __init__(self):
+        super().__init__(
+                "Mermaid",
+                f"Heroes cannot gain {constants.DAMAGE} or {constants.INFLUENCE} from Allies",
+                f"ALL heroes may take Ally from discard; remove 1{constants.CONTROL}",
+                cost=5)
+
+    def _on_reveal(self, game):
+        game.heroes.all_heroes.disallow_gaining_tokens_from_allies(game)
+
+    def _on_stun(self, game):
+        game.heroes.all_heroes.allow_gaining_tokens_from_allies(game)
+
+    def _on_recover_from_stun(self, game):
+        game.heroes.all_heroes.disallow_gaining_tokens_from_allies(game)
+
+    def _effect(self, game):
+        pass
+
+    def remove_callbacks(self, game):
+        game.heroes.all_heroes.allow_gaining_tokens_from_allies(game)
+
+    def _reward(self, game):
+        game.locations.remove_control(game)
+        game.heroes.all_heroes.effect(game, self.__per_hero)
+
+    def __per_hero(self, game, hero):
+        allies = [card for card in hero._discard if card.is_ally()]
+        if len(allies) == 0:
+            game.log(f"{hero.name} has no allies in discard")
+            return
+        game.log(f"Allies in {hero.name}'s discard:")
+        for i, ally in enumerate(allies):
+            game.log(f" {i}: {ally}")
+        choices = ['c'] + [str(i) for i in range(len(allies))]
+        choice = game.input(f"Choose an ally for {hero.name} to take or (c)ancel: ", choices)
+        if choice == 'c':
+            return
+        ally = allies[int(choice)]
+        hero._discard.remove(ally)
+        hero._hand.append(ally)
+
+VILLAINS_BY_NAME["Mermaid"] = Mermaid
+
+
+class MonsterBoxFourVoldemort(Villain):
+    def __init__(self):
+        super().__init__(
+                "Lord Voldemort",
+                f"Lose 2{constants.HEART}; Add 1{constants.CONTROL}; Each time a Hero is stunned, add an extra {constants.CONTROL}",
+                "You win!",
+                hearts=25, cost=7)
+
+    def _on_reveal(self, game):
+        game.heroes.all_heroes.add_hearts_callback(game, self)
+
+    def _effect(self, game):
+        game.heroes.active_hero.remove_hearts(game, 2)
+        game.locations.add_control(game)
+
+    def hearts_callback(self, game, hero, amount, source):
+        if amount <= 0:
+            return
+        if not hero.is_stunned:
+            return
+        if self._stunned:
+            game.log(f"{self.name} is stunned! No penalty for stunned hero")
+            return
+        game.log(f"{self.name}: {hero.name} is stunned, adding an extra {constants.CONTROL}")
+        game.locations.add_control(game)
+
+    def remove_callbacks(self, game):
+        game.heroes.remove_hearts_callback(game, self)
+
+    def _reward(self, game):
+        pass
 
 
 # Plus voldemort!
@@ -1294,7 +1530,3 @@ VILLAIN_DECK_SIZE = {
     "p3": 0,
     "p4": 0,
 }
-# game 1: voldemort 5
-# game 2: voldemort 6
-# game 3: voldemort 7
-# game 4: voldemort special
