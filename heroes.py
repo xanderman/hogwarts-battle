@@ -21,12 +21,13 @@ class DisplayMode(Enum):
 DISPLAY_MODES = [DisplayMode.DEFAULT, DisplayMode.HAND, DisplayMode.PLAY_AREA, DisplayMode.DISCARD]
 
 
-# TODO: if you have more than 50 cards to choose from, may God have mercy on your soul
-ALPHA_OPTIONS = ['a', 'b', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-                 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y',
-                 'z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
-                 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W',
-                 'X', 'Y', 'Z']
+# Letters excluding ones used for alternates, like (c)ancel, (i)nfluence, etc
+# If you have more than 50 cards to choose from, may God have mercy on your soul
+ALPHA_OPTIONS = ['a', 'b', 'd', 'e', 'f', 'g', 'j', 'k', 'l', 'm',
+                 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w',
+                 'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F', 'G',
+                 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q',
+                 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
 
 
 class Heroes(object):
@@ -450,41 +451,48 @@ class Hero(object):
                 discarded.append(self.discard(game, i, with_callbacks))
         return discarded
 
-    def choose_and_banish(self, game, desc="card", hand_only=False, optional=True, filter=lambda card: True):
-        choices = ['c'] if optional else []
-        choices += [str(i) for i in range(len(self._hand)) if filter(self._hand[i])]
+    def choose_and_banish(self, game, desc="card", hand_only=False, optional=True, card_filter=lambda card: True, cancel_with='c', cancel_desc='to cancel'):
+        choices = [cancel_with] if optional else []
+        choices += [str(i) for i in range(len(self._hand)) if card_filter(self._hand[i])]
 
         if hand_only:
             prompt = f"Choose {desc} for {self.name} to banish: "
             if optional:
-                prompt = f"Choose {desc} for {self.name} to banish ('c' to cancel): "
+                prompt = f"Choose {desc} for {self.name} to banish ('{cancel_with}' {cancel_desc}): "
         else:
             prompt = f"Choose {desc} for {self.name} to banish (0-9 for hand, a-Z for discard): "
             if optional:
-                prompt = f"Choose {desc} for {self.name} to banish (0-9 for hand, a-Z for discard, 'c' to cancel): "
-            discard_choices = [i for i in range(len(self._discard)) if filter(self._discard[i])]
-            if len(discard_choices) > 0:
-                game.log(f"Cards in {self.name}'s discard:")
-                for i in discard_choices:
-                    key = ALPHA_OPTIONS[i]
-                    choices.append(key)
-                    game.log(f" {key}: {self._discard[i]}")
+                prompt = f"Choose {desc} for {self.name} to banish (0-9 for hand, a-Z for discard, '{cancel_with}' {cancel_desc}): "
+            discard_choices = self.choices_in_discard(game, card_filter=card_filter)
+            choices.extend(discard_choices.keys())
 
         if len(choices) == 0 or (len(choices) == 1 and optional):
             game.log(f"{self.name} has no valid cards to banish!")
             return None
 
         choice = game.input(prompt, choices)
-        if choice == "c":
+        if choice == cancel_with:
             return None
         try:
             choice = self._hand[int(choice)]
             self._hand.remove(choice)
         except ValueError:
-            choice = self._discard[ALPHA_OPTIONS.index(choice)]
+            choice = discard_choices[choice]
             self._discard.remove(choice)
         game.log(f"{self.name} banishes {choice}")
         return choice
+
+    def choices_in_discard(self, game, log=True, card_filter=lambda card: True):
+        cards = [i for i in range(len(self._discard)) if card_filter(self._discard[i])]
+        choices = {ALPHA_OPTIONS[i]: self._discard[i] for i in cards}
+        if log:
+            if len(choices) == 0:
+                game.log(f"No valid cards in {self.name}'s discard")
+            else:
+                game.log(f"Cards in {self.name}'s discard:")
+                for key, card in choices.items():
+                    game.log(f" {key}: {card}")
+        return choices
 
     def add_acquire_callback(self, game, callback):
         self._acquire_callbacks.append(callback)
@@ -609,23 +617,34 @@ class Hero(object):
         else:
             self.play_card(game, int(choice))
 
+    def source_is_ally(self, game):
+        call_stack = inspect.stack()
+        for frame in call_stack[1:]:
+            if frame.function == "add_damage" or frame.function == "add_influence":
+                continue
+            if frame.function == "remove_damage" or frame.function == "remove_influence":
+                continue
+            if frame.function == "add":
+                continue
+            if frame.function == "f":
+                continue
+            if 'self' not in frame.frame.f_locals:
+                continue
+            f_self = frame.frame.f_locals['self']
+            if f_self == game:
+                continue
+            try:
+                return f_self.is_ally()
+            except AttributeError:
+                return False
+        return False
+
     def add_damage(self, game, amount=1):
         if amount > 0 and not self.gaining_tokens_allowed(game):
             game.log(f"{self.name}: gaining {constants.DAMAGE} on other heroes' turns not allowed!")
             return
 
-        # TODO: this should apply to second-order effects, like dice rolls, as well
-        call_stack = inspect.stack()
-        source = call_stack[1]
-        if source.function == "remove_damage" or source.function == "add":
-            source = call_stack[2]
-        if source.function == "f":
-            source = call_stack[3]
-        try:
-            source_is_ally = source.frame.f_locals['self'].is_ally()
-        except AttributeError:
-            source_is_ally = False
-        if amount > 0 and source_is_ally and not self._gaining_from_allies_allowed:
+        if amount > 0 and self.source_is_ally(game) and not self._gaining_from_allies_allowed:
             game.log(f"{self.name}: cannot gain {constants.DAMAGE} from Allies!")
             return
 
@@ -645,6 +664,9 @@ class Hero(object):
             return
         if len(game.villain_deck.choices) == 0:
             game.log(f"No villains to assign {constants.DAMAGE} to!")
+            return None
+        if sum(1 for v in game.villain_deck.all if v.can_take_damage(game)) == 0:
+            game.log(f"No villains to assign {constants.INFLUENCE} to!")
             return None
         choices = ['c'] + game.villain_deck.choices
         choice = game.input(f"Choose villain to assign {constants.DAMAGE} to ('c' to cancel): ", choices)
@@ -680,6 +702,9 @@ class Hero(object):
         if len(game.villain_deck.choices) == 0:
             game.log(f"No villains to assign {constants.INFLUENCE} to!")
             return None
+        if sum(1 for v in game.villain_deck.all if v.can_take_influence(game)) == 0:
+            game.log(f"No villains to assign {constants.INFLUENCE} to!")
+            return None
         choices = ['c'] + game.villain_deck.choices
         choice = game.input(f"Choose villain to assign {constants.INFLUENCE} to ('c' to cancel): ", choices)
         if choice == 'c':
@@ -712,18 +737,7 @@ class Hero(object):
             game.log(f"{self.name}: gaining {constants.INFLUENCE} on other heroes' turns not allowed!")
             return
 
-        # TODO: this should apply to second-order effects, like dice rolls, as well
-        call_stack = inspect.stack()
-        source = call_stack[1]
-        if source.function == "remove_influence" or source.function == "add":
-            source = call_stack[2]
-        if source.function == "f":
-            source = call_stack[3]
-        try:
-            source_is_ally = source.frame.f_locals['self'].is_ally()
-        except AttributeError:
-            source_is_ally = False
-        if amount > 0 and source_is_ally and not self._gaining_from_allies_allowed:
+        if amount > 0 and self.source_is_ally(game) and not self._gaining_from_allies_allowed:
             game.log(f"{self.name}: cannot gain {constants.INFLUENCE} from Allies!")
             return
 

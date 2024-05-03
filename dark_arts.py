@@ -371,7 +371,7 @@ class AvadaKedavra(DarkArtsCard):
     def __init__(self):
         super().__init__(
             "Avada Kedavra",
-            f"Active hero loses 3{constants.HEART}, if stun add +1{constants.CONTROL}; reveal another card")
+            f"Active hero loses 3{constants.HEART}, if this stuns add +1{constants.CONTROL}; reveal another card")
 
     def _effect(self, game):
         hero = game.heroes.active_hero
@@ -627,7 +627,7 @@ class ViciousBite(DarkArtsCard):
     def __init__(self):
         super().__init__(
             "Vicious Bite",
-            f"ALL heroes with least {constants.HEART} lose 2{constants.HEART}; if anyone is stunned, add an extra {constants.CONTROL}")
+            f"ALL heroes with least {constants.HEART} lose 2{constants.HEART}; if this stuns anyone, add an extra {constants.CONTROL}")
 
     def _effect(self, game):
         min_hearts = min(hero._hearts for hero in game.heroes.all_heroes)

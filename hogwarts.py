@@ -582,20 +582,18 @@ class Accio(Spell):
 
     def _effect(self, game):
         hero = game.heroes.active_hero
-        items = [card for card in hero._discard if card.is_item()]
+        items = hero.choices_in_discard(game, card_filter=lambda card: card.is_item())
         if len(items) == 0:
             game.log(f"{hero.name} has no items in discard, gaining 2{constants.INFLUENCE}")
             hero.add_influence(game, 2)
             return
-        game.log(f"Items in {hero.name}'s discard: ")
-        for i, item in enumerate(items):
-            game.log(f" {i}: {item}")
-        choices = ['i'] + [str(i) for i in range(len(items))]
+        choices = ['i']
+        choices.extend(items.keys())
         choice = game.input(f"Choose an item for {hero.name} to take, or (i) to gain 2{constants.INFLUENCE}: ", choices)
         if choice == 'i':
             hero.add_influence(game, 2)
             return
-        item = items[int(choice)]
+        item = items[choice]
         hero._discard.remove(item)
         hero._hand.append(item)
 
@@ -1256,12 +1254,9 @@ class Depulso(Spell):
             3)
 
     def _effect(self, game):
-        # TODO: asks for banish even if no items in hand or discard
-        choice = game.input(f"Choose effect: (i){constants.INFLUENCE}, (b)anish: ", "ib")
-        if choice == "i":
+        banished = game.heroes.active_hero.choose_and_banish(game, desc="item", card_filter=lambda card: card.is_item(), cancel_with='i', cancel_desc=f"to gain 2{constants.INFLUENCE}")
+        if banished is None:
             game.heroes.active_hero.add_influence(game, 2)
-        elif choice == "b":
-            game.heroes.active_hero.choose_and_banish(game, desc="item", filter=lambda card: card.is_item())
 
 
 monster_box_two_cards = [
@@ -1286,7 +1281,9 @@ class Kreacher(Ally):
 
     def _effect(self, game):
         game.roll_creature_die()
-        game.heroes.choose_hero(game, prompt=f"Choose hero to banish a card: ", optional=True).choose_and_banish(game)
+        hero = game.heroes.choose_hero(game, prompt=f"Choose hero to banish a card (c to cancel): ", optional=True)
+        if hero is not None:
+          hero.choose_and_banish(game)
 
 
 class Thestral(Ally):
@@ -1433,16 +1430,23 @@ class Gillyweed(Item):
 
     def _effect(self, game):
         game.heroes.active_hero.add_hearts(game)
-        for card in game.heroes.active_hero._play_area:
-            if card.is_ally():
-                game.log(f"Ally {card.name} already played, gillyweed grants {constants.HEART}")
-                game.heroes.choose_hero(game, prompt=f"Choose hero to gain 1{constants.HEART}: ").add_hearts(game)
+        if not game.heroes.healing_allowed:
+            game.log("Healing not allowed, ignoring Ally bonus")
+        else:
+            for card in game.heroes.active_hero._play_area:
+                if card.is_ally():
+                    game.log(f"Ally {card.name} already played, gillyweed grants {constants.HEART}")
+                    game.heroes.choose_hero(game, prompt=f"Choose hero to gain 1{constants.HEART}: ").add_hearts(game)
         game.heroes.active_hero.add_extra_card_effect(game, self.__add_heart_if_ally)
 
     def __add_heart_if_ally(self, game, card):
-        if card.is_ally():
-            game.log(f"Ally {card.name} played, gillyweed grants {constants.HEART}")
-            game.heroes.choose_hero(game, prompt=f"Choose hero to gain 1{constants.HEART}: ").add_hearts(game)
+        if not card.is_ally():
+            return
+        if not game.heroes.healing_allowed:
+            game.log("Gillyweed: Healing not allowed, ignoring Ally bonus")
+            return
+        game.log(f"Ally {card.name} played, gillyweed grants {constants.HEART}")
+        game.heroes.choose_hero(game, prompt=f"Choose hero to gain 1{constants.HEART}: ").add_hearts(game)
 
 
 class DragonsBlood(Item):

@@ -212,8 +212,9 @@ class Foe(object):
         self._cost = cost
 
         self._damage = 0
+        self._can_take_damage = True
         self._took_damage = 0
-        self._max_damage_per_turn = 100
+        self._max_damage_per_turn = -1
         self._influence = 0
         self._took_influence = 0
         self._max_influence_per_turn = 1
@@ -257,8 +258,9 @@ class Foe(object):
         raise ValueError(f"Programmer Error! Forgot to implement effect for {self.name}")
 
     def end_turn(self, game):
+        self._can_take_damage = True
         self._took_damage = 0
-        self._max_damage_per_turn = 100
+        self._max_damage_per_turn = -1
         self._took_influence = 0
         self._max_influence_per_turn = 1
 
@@ -282,11 +284,13 @@ class Foe(object):
         return self._took_damage > 0
 
     def can_take_damage(self, game):
+        if not self._can_take_damage:
+            return False
         if self._hearts == 0:
             return False
         if self._damage >= self._hearts:
             return False
-        if self._took_damage >= self._max_damage_per_turn:
+        if self._max_damage_per_turn >= 0 and self._took_damage >= self._max_damage_per_turn:
             return False
         if self == game.villain_deck._voldemort and not game.villain_deck.voldemort_vulnerable(game):
             return False
@@ -586,20 +590,18 @@ class TomRiddle(Villain):
         game.heroes.all_heroes.effect(game, self.__per_hero)
 
     def __per_hero(self, game, hero):
-        allies = [card for card in hero._discard if card.is_ally()]
+        allies = hero.choices_in_discard(game, card_filter=lambda card: card.is_ally())
         if len(allies) == 0:
             game.log(f"{hero.name} has no allies in discard, gaining 2{constants.HEART}")
             hero.add_hearts(game, 2)
             return
-        game.log(f"Allies in {hero.name}'s discard:")
-        for i, ally in enumerate(allies):
-            game.log(f" {i}: {ally}")
-        choices = ['h'] + [str(i) for i in range(len(allies))]
+        choices = ['h']
+        choices.extend(allies.keys())
         choice = game.input(f"Choose an ally for {hero.name} to take or (h) to gain 2{constants.HEART}: ", choices)
         if choice == 'h':
             hero.add_hearts(game, 2)
             return
-        ally = allies[int(choice)]
+        ally = allies[choice]
         hero._discard.remove(ally)
         hero._hand.append(ally)
 
@@ -655,24 +657,16 @@ class PeterPettigrew(Villain):
         game.heroes.all_heroes.effect(game, self.__per_hero)
 
     def __per_hero(self, game, hero):
-        spells = [card for card in hero._discard if card.is_spell()]
+        spells = hero.choices_in_discard(game, card_filter=lambda card: card.is_spell())
         if len(spells) == 0:
             game.log(f"{hero.name} has no spells in discard")
             return
-        if len(spells) == 1:
-            spell = spells[0]
-            game.log(f"{hero.name} has only one spell in discard, taking {spell}")
-            hero._discard.remove(spell)
-            hero._hand.append(spell)
-            return
-        game.log(f"Spells in {hero.name}'s discard:")
-        for i, spell in enumerate(spells):
-            game.log(f" {i}: {spell}")
-        choices = ['c'] + [str(i) for i in range(len(spells))]
+        choices = ['c']
+        choices.extend(spells.keys())
         choice = game.input(f"Choose a Spell for {hero.name} to take or (c)ancel: ", choices)
         if choice == 'c':
             return
-        spell = spells[int(choice)]
+        spell = spells[choice]
         hero._discard.remove(spell)
         hero._hand.append(spell)
 
@@ -804,24 +798,16 @@ class BellatrixLestrange(Villain):
         game.heroes.all_heroes.effect(game, self.__per_hero)
 
     def __per_hero(self, game, hero):
-        items = [card for card in hero._discard if card.is_item()]
+        items = hero.choices_in_discard(game, card_filter=lambda card: card.is_item())
         if len(items) == 0:
             game.log(f"{hero.name} has no items in discard")
             return
-        if len(items) == 1:
-            item = items[0]
-            game.log(f"{hero.name} has only one item in discard, taking {item}")
-            hero._discard.remove(item)
-            hero._hand.append(item)
-            return
-        game.log(f"Items in {hero.name}'s discard:")
-        for i, item in enumerate(items):
-            game.log(f" {i}: {item}")
-        choices = ['c'] + [str(i) for i in range(len(items))]
+        choices = ['c']
+        choices.extend(items.keys())
         choice = game.input(f"Choose an Item for {hero.name} to take or (c)ancel: ", choices)
         if choice == 'c':
             return
-        item = items[int(choice)]
+        item = items[choice]
         hero._discard.remove(item)
         hero._hand.append(item)
 
@@ -1007,7 +993,7 @@ class Troll(Creature):
 
     def __reward_per_hero(self, game, hero):
         hero.add_hearts(game, 1)
-        hero.choose_and_banish(game, desc="item", filter=lambda card: card.is_item())
+        hero.choose_and_banish(game, desc="item", card_filter=lambda card: card.is_item())
 
 VILLAINS_BY_NAME["Troll"] = Troll
 
@@ -1167,24 +1153,16 @@ class Scabbers(VillainCreature):
         game.heroes.all_heroes.effect(game, self.__per_hero)
 
     def __per_hero(self, game, hero):
-        cards = [card for card in hero._discard if card.cost <= 3]
+        cards = hero.choices_in_discard(game, card_filter=lambda card: card.cost <= 3)
         if len(cards) == 0:
             game.log(f"{hero.name} has no cheap cards in discard")
             return
-        if len(cards) == 1:
-            card = cards[0]
-            game.log(f"{hero.name} has only one cheap card in discard, taking {card}")
-            hero._discard.remove(card)
-            hero._hand.append(card)
-            return
-        game.log(f"Cheap cards in {hero.name}'s discard:")
-        for i, card in enumerate(cards):
-            game.log(f" {i}: {card}")
-        choices = ['c'] + [str(i) for i in range(len(cards))]
+        choices = ['c']
+        choices.extend(cards.keys())
         choice = game.input(f"Choose a card for {hero.name} to take or (c)ancel: ", choices)
         if choice == 'c':
             return
-        card = cards[int(choice)]
+        card = cards[choice]
         hero._discard.remove(card)
         hero._hand.append(card)
 
@@ -1248,24 +1226,16 @@ class Centaur(Creature):
         game.heroes.all_heroes.effect(game, self.__per_hero)
 
     def __per_hero(self, game, hero):
-        cards = [card for card in hero._discard if card.is_spell()]
+        cards = hero.choices_in_discard(game, card_filter=lambda card: card.is_spell())
         if len(cards) == 0:
             game.log(f"{hero.name} has no Spells in discard")
             return
-        if len(cards) == 1:
-            card = cards[0]
-            game.log(f"{hero.name} has only one Spells in discard, taking {card}")
-            hero._discard.remove(card)
-            hero._hand.append(card)
-            return
-        game.log(f"Spells in {hero.name}'s discard:")
-        for i, card in enumerate(cards):
-            game.log(f" {i}: {card}")
-        choices = ['c'] + [str(i) for i in range(len(cards))]
+        choices = ['c']
+        choices.extend(cards.keys())
         choice = game.input(f"Choose a card for {hero.name} to take or (c)ancel: ", choices)
         if choice == 'c':
             return
-        card = cards[int(choice)]
+        card = cards[choice]
         hero._discard.remove(card)
         hero._hand.append(card)
 
@@ -1323,7 +1293,7 @@ class Grawp(Creature):
             hero.draw(game, 2)
         elif game.input("Drawing not allowed, still discard? (y/n): ", "yn") == 'n':
             return
-        # TODO: callbacks? It's technically an enemy, but it's a reward
+        # No callbacks. It's technically an enemy, but it's a reward.
         hero.choose_and_discard(game, with_callbacks=False)
 
 VILLAINS_BY_NAME["Grawp"] = Grawp
@@ -1376,7 +1346,19 @@ class HungarianHorntail(Creature):
         for foe in game.villain_deck.current:
             if foe is self:
                 continue
-            foe._max_damage_per_turn = 0
+            foe._can_take_damage = False
+
+    def _on_stun(self, game):
+        for foe in game.villain_deck.current:
+            if foe is self:
+                continue
+            foe._can_take_damage = True
+
+    def _on_recover_from_stun(self, game):
+        for foe in game.villain_deck.current:
+            if foe is self:
+                continue
+            foe._can_take_damage = False
 
     def _reward(self, game):
         game.roll_creature_die()
@@ -1468,18 +1450,16 @@ class Mermaid(Creature):
         game.heroes.all_heroes.effect(game, self.__per_hero)
 
     def __per_hero(self, game, hero):
-        allies = [card for card in hero._discard if card.is_ally()]
+        allies = hero.choices_in_discard(game, card_filter=lambda card: card.is_ally())
         if len(allies) == 0:
             game.log(f"{hero.name} has no allies in discard")
             return
-        game.log(f"Allies in {hero.name}'s discard:")
-        for i, ally in enumerate(allies):
-            game.log(f" {i}: {ally}")
-        choices = ['c'] + [str(i) for i in range(len(allies))]
+        choices = ['c']
+        choices.extend(allies.keys())
         choice = game.input(f"Choose an ally for {hero.name} to take or (c)ancel: ", choices)
         if choice == 'c':
             return
-        ally = allies[int(choice)]
+        ally = allies[choice]
         hero._discard.remove(ally)
         hero._hand.append(ally)
 
@@ -1502,7 +1482,7 @@ class MonsterBoxFourVoldemort(Villain):
         game.locations.add_control(game)
 
     def hearts_callback(self, game, hero, amount, source):
-        if amount <= 0:
+        if amount >= 0:
             return
         if not hero.is_stunned:
             return
