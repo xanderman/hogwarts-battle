@@ -1,6 +1,8 @@
 #!/opt/homebrew/bin/python3
 
 from datetime import datetime
+from pathlib import Path
+from yaml import safe_load
 
 import argparse
 import curses
@@ -20,32 +22,32 @@ class DebugGame(Exception):
 
 
 class Game(object):
-    def __init__(self, window, game_num, chosen_heroes):
+    def __init__(self, window, config, chosen_heroes):
         self._window = window
         self._window.noutrefresh()
-        if isinstance(game_num, int) and game_num < 7:
-            locations_window = window.subwin(7, curses.COLS // 2, 0, 0)
-            dark_arts_window = window.subwin(7, curses.COLS // 2, 0, curses.COLS // 2)
-            self.encounters = None
-        else:
+        if config['encounters']:
             locations_window = window.subwin(7, curses.COLS // 3, 0, 0)
             enounters_window = window.subwin(7, curses.COLS // 3, 0, curses.COLS // 3)
             dark_arts_window = window.subwin(7, curses.COLS // 3, 0, curses.COLS * 2 // 3)
-            self.encounters = encounters.EncountersDeck(enounters_window, game_num)
+            self.encounters = encounters.EncountersDeck(enounters_window, config['encounters'])
+        else:
+            locations_window = window.subwin(7, curses.COLS // 2, 0, 0)
+            dark_arts_window = window.subwin(7, curses.COLS // 2, 0, curses.COLS // 2)
+            self.encounters = None
 
-        self.locations = locations.Locations(locations_window, game_num)
-        self.dark_arts_deck = dark_arts.DarkArtsDeck(dark_arts_window, game_num)
+        self.locations = locations.Locations(locations_window, config['locations'], len(chosen_heroes))
+        self.dark_arts_deck = dark_arts.DarkArtsDeck(dark_arts_window, config['dark_arts_deck'])
 
         villains_window = window.subwin(15, curses.COLS // 2, 7, 0)
-        self.villain_deck = villains.VillainDeck(villains_window, game_num, self.encounters)
+        self.villain_deck = villains.VillainDeck(villains_window, config['villains_deck'], self.encounters)
 
         hogwarts_window = window.subwin(15, curses.COLS // 2, 7, curses.COLS // 2)
-        self.hogwarts_deck = hogwarts.HogwartsDeck(hogwarts_window, game_num)
+        self.hogwarts_deck = hogwarts.HogwartsDeck(hogwarts_window, config['hogwarts_deck'])
 
         # self._heroes_height = 40 if len(chosen_heroes) > 2 else 20
         self._heroes_height = (curses.LINES - 22) // 4 * 3
         self._heroes_window = window.subwin(self._heroes_height, curses.COLS, 22, 0)
-        self.heroes = heroes.Heroes(self._heroes_window, game_num, chosen_heroes)
+        self.heroes = heroes.Heroes(self._heroes_window, chosen_heroes)
 
         log_begin = 22 + self._heroes_height
         self._log_window = window.subwin(curses.LINES - log_begin, curses.COLS, log_begin, 0)
@@ -238,7 +240,8 @@ class Game(object):
             self.locations.remove_control(self)
 
 
-def main(stdscr, game_num, chosen_heroes):
+# def main(stdscr, game_num, chosen_heroes):
+def main(stdscr, config, chosen_heroes):
     # For active hero & location, and input prompts
     curses.init_pair(1, curses.COLOR_GREEN, curses.COLOR_BLACK)
     # For spells
@@ -247,7 +250,8 @@ def main(stdscr, game_num, chosen_heroes):
     curses.init_pair(3, curses.COLOR_CYAN, curses.COLOR_BLACK)
     # For items
     curses.init_pair(4, curses.COLOR_YELLOW, curses.COLOR_BLACK)
-    game = Game(stdscr, game_num, chosen_heroes)
+    # game = Game(stdscr, game_num, chosen_heroes)
+    game = Game(stdscr, config, chosen_heroes)
     while True:
         try:
             game.play_turn()
@@ -260,32 +264,28 @@ def main(stdscr, game_num, chosen_heroes):
         if game.locations.is_controlled(game) and not game.locations.advance(game):
             return False
 
-class GameNumAction(argparse.Action):
+class ConfigFileAction(argparse.Action):
     def __call__(self, parser, namespace, value, option_string=None):
-        try:
-            base_game_num = int(value)
-            if base_game_num < 1 or base_game_num > 7:
-                parser.error("Game number must be between 1 and 7")
-            setattr(namespace, self.dest, base_game_num)
-        except ValueError:
-            if value not in ["m1", "m2", "m3", "m4", "p1", "p2", "p3", "p4"]:
-                parser.error("Expansion games are from {m,p}[1-4]")
-            setattr(namespace, self.dest, value)
+        config_file = Path(value)
+        if not config_file.exists():
+            parser.error(f"Config file {config_file} does not exist")
+        config = safe_load(config_file.read_text())
+        setattr(namespace, self.dest, config)
 
 
 class HeroArgAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         if len(values) > 4:
             parser.error("Cannot play with more than 4 heroes")
-        game_num = namespace.game_num
+        proficiencies_allowed = namespace.config['proficiencies'] if 'proficiencies' in namespace.config else False
         chosen_heroes = []
         for hero_name in values:
             parts = hero_name.split(":")
-            if isinstance(game_num, int) and game_num < 6:
+            if not proficiencies_allowed:
                 if len(parts) > 1:
-                    parser.error(f"Proficiencies cannot be used in game {game_num}")
+                    parser.error(f"Proficiencies cannot be used in game {namespace.config['name']}")
             elif len(parts) == 1:
-                parser.error(f"Proficiencies must be specified in game {game_num}")
+                parser.error(f"Proficiencies must be specified in game {namespace.config['name']}")
             if len(parts) > 2:
                 parser.error(f"Heroes must be specified as 'NAME' or 'NAME:PROFICIENCY'")
 
@@ -300,18 +300,20 @@ class HeroArgAction(argparse.Action):
                 proficiency = proficiencies.PROFICIENCIES[proficiency_name]()
             else:
                 proficiency = proficiencies.NullProficiency()
-            chosen_heroes.append(heroes.HEROES[hero_name](game_num, proficiency))
+            chosen_heroes.append(heroes.HEROES[hero_name](namespace.config['hero_abilities'], proficiency))
         setattr(namespace, self.dest, chosen_heroes)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Play Harry Potter: Hogwarts Battle")
-    parser.add_argument("game_num", metavar="GAME", action=GameNumAction, help="Game number to play, 1-7")
+    parser.add_argument("config", metavar="FILE", action=ConfigFileAction, help="Game configuration file")
     parser.add_argument("heroes", metavar="HERO", nargs="+", action=HeroArgAction,
                         help=f"""Hero to play, min 1, max 4. For games 6 and up, specify as NAME:PROFICIENCY.
                         Valid names are {', '.join(heroes.HEROES.keys())}. Valid
                         proficiencies are {', '.join(proficiencies.PROFICIENCIES.keys())}.""")
     parser.add_argument("--seed", type=int, default=None, help="Random seed to use")
     args = parser.parse_args()
+
+    print("Playing " + args.config['name'])
 
     seed = args.seed
     if seed is None:
@@ -321,7 +323,7 @@ if __name__ == '__main__':
     random.seed(seed)
 
     try:
-        if curses.wrapper(main, args.game_num, args.heroes):
+        if curses.wrapper(main, args.config, args.heroes):
             print("You won!")
         else:
             print("You lost!")

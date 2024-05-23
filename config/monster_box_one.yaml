@@ -1,0 +1,183 @@
+name: "Monster Book of Monsters Box 1"
+hero_abilities: 7
+proficiencies: Yes
+encounters:
+  title: Encounters
+  complete: completed
+  deck:
+    - Peskipiksi Pesternomi
+    - Students Out of Bed
+    - Third Floor Corridor
+locations:
+  - Castle Gates
+  - Hagrid's Hut
+  - Great Hall
+dark_arts_deck:
+  - Petrification
+  - Petrification
+  - Expulso
+  - Expulso
+  - Expulso
+  - He Who Must Not Be Named
+  - He Who Must Not Be Named
+  - He Who Must Not Be Named
+  - Flipendo
+  - Flipendo
+  - Hand of Glory
+  - Hand of Glory
+  - Relashio
+  - Poison
+  - Obliviate
+  - Dementor's Kiss
+  - Dementor's Kiss
+  - Opugno
+  - Tarantallegra
+  - Morsmordre
+  - Morsmordre
+  - Regeneration
+  - Imperio
+  - Avada Kedavra
+  - Heir of Slytherin
+  - Heir of Slytherin
+  - Crucio
+  - Educational Decree
+  - Educational Decree
+  - Legilimency
+  - Morsmordre
+  - Imperio
+  - Avada Kedavra
+  - Crucio
+  - Sectumsempra
+  - Sectumsempra
+  - Morsmordre
+  - Fiendfyre
+  - Imperio
+  - Avada Kedavra
+  - Crucio
+  - Menacing Growl
+  - Menacing Growl
+  - Inquisitorial Squad
+  - Inquisitorial Squad
+  - Raging Troll
+  - Raging Troll
+  - Slugulus Eructo
+  - Blast-ended
+villains_deck:
+  villains: 11
+  villains_revealed: 3
+  voldemort: Game Five Voldemort
+hogwarts_deck:
+  - Wingardium Leviosa
+  - Wingardium Leviosa
+  - Wingardium Leviosa
+  - Reparo
+  - Reparo
+  - Reparo
+  - Reparo
+  - Reparo
+  - Reparo
+  - Lumos
+  - Lumos
+  - Incendio
+  - Incendio
+  - Incendio
+  - Incendio
+  - Descendo
+  - Descendo
+  - Essence of Dittany
+  - Essence of Dittany
+  - Essence of Dittany
+  - Essence of Dittany
+  - Quidditch Gear
+  - Quidditch Gear
+  - Quidditch Gear
+  - Quidditch Gear
+  - Sorting Hat
+  - Golden Snitch
+  - Oliver Wood
+  - Rubeus Hagrid
+  - Albus Dumbledore
+  - Finite
+  - Finite
+  - Expelliarmus
+  - Expelliarmus
+  - Polyjuice Potion
+  - Polyjuice Potion
+  - Nimbus 2001
+  - Nimbus 2001
+  - Fawkes
+  - Molly Weasley
+  - Dobby
+  - Arthur Weasley
+  - Gilderoy Lockhart
+  - Ginny Weasley
+  - Expecto Patronum
+  - Expecto Patronum
+  - Petrificus Totalus
+  - Petrificus Totalus
+  - Chocolate Frog
+  - Chocolate Frog
+  - Chocolate Frog
+  - Butterbeer
+  - Butterbeer
+  - Butterbeer
+  - Crystal Ball
+  - Crystal Ball
+  - Marauder's Map
+  - Remus Lupin
+  - Sybill Trelawney
+  - Accio
+  - Accio
+  - Protego
+  - Protego
+  - Protego
+  - "Hogwarts: A History"
+  - "Hogwarts: A History"
+  - "Hogwarts: A History"
+  - "Hogwarts: A History"
+  - "Hogwarts: A History"
+  - "Hogwarts: A History"
+  - Pensieve
+  - Triwizard Cup
+  - Severus Snape
+  - Fleur Delacour
+  - Filius Flitwick
+  - Cedric Diggory
+  - Viktor Krum
+  - Mad-eye Moody
+  - Minerva McGonagall
+  - Pomona Sprout
+  - Stupefy
+  - Stupefy
+  - O.W.L.S.
+  - O.W.L.S.
+  - Nymphadora Tonks
+  - Fred Weasley
+  - George Weasley
+  - Cho Chang
+  - Luna Lovegood
+  - Kingsley Shacklebolt
+  - Confundus
+  - Confundus
+  - Bezoar
+  - Bezoar
+  - Deluminator
+  - Advanced Potion-Making
+  - Felix Felicis
+  - Felix Felicis
+  - Elder Wand
+  - Horace Slughorn
+  - Sword of Gryffindor
+  - Tergeo
+  - Tergeo
+  - Tergeo
+  - Tergeo
+  - Tergeo
+  - Tergeo
+  - Finite Incantatem
+  - Finite Incantatem
+  - Old Sock
+  - Old Sock
+  - Harp
+  - Fang
+  - Argus Filch & Mrs Norris

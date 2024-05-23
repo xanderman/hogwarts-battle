@@ -9,13 +9,14 @@ import hogwarts
 
 # In game 7 these are Horcurxes, but in the expansions the concept is generalized into Encounters.
 class EncountersDeck(object):
-    def __init__(self, window, game_num):
-        self._game_num = game_num
+    def __init__(self, window, config):
+        self._title = config['title']
+        self._null_encounter = NullEncounter(self._title, config['complete'])
         self._window = window
         self._init_window()
         self._pad = curses.newpad(100, 100)
 
-        self._deck = build_deck(game_num)
+        self._deck = [ENCOUNTERS_BY_NAME[name]() for name in config['deck']]
         self._current = self._deck.pop(0)
 
     def _init_window(self):
@@ -46,10 +47,6 @@ class EncountersDeck(object):
         return reduce(operator.add, [encounter.required_villains for encounter in self._deck])
 
     @property
-    def _title(self):
-        return "Horcruxes" if self._game_num == 7 else "Encounters"
-
-    @property
     def current(self):
         return self._current
 
@@ -57,7 +54,7 @@ class EncountersDeck(object):
     def all_complete(self):
         if len(self._deck) > 0:
             return False
-        return type(self._current) == NullEncounter or self._current.completed
+        return self._current == self._null_encounter or self._current.completed
 
     def play_turn(self, game):
         game.log(f"-----{self._title} phase-----")
@@ -65,27 +62,15 @@ class EncountersDeck(object):
         self._current.effect(game)
 
     def check_completion(self, game):
+        self._current.end_turn(game)
         if not self._current.completed:
             return
         game.heroes.active_hero.add_encounter(game, self._current)
-        self._current = self._deck.pop(0) if len(self._deck) > 0 else NullEncounter(self._game_num)
+        self._current = self._deck.pop(0) if len(self._deck) > 0 else self._null_encounter
         self._current.on_reveal(game)
 
 
-def build_deck(game_num):
-    if isinstance(game_num, int) and game_num < 7:
-        raise ValueError("Progammer Error! Encounters deck only exists in games 7+")
-    if game_num == 7:
-        deck = game_seven_horcruxes
-    elif game_num == "m1":
-        deck = monster_box_one_encounters
-    elif game_num == "m2":
-        deck = monster_box_two_encounters
-    elif game_num == "m3":
-        deck = monster_box_three_encounters
-    elif game_num == "m4":
-        deck = monster_box_four_encounters
-    return [encounter() for encounter in deck]
+ENCOUNTERS_BY_NAME = {}
 
 
 class Encounter(object):
@@ -126,24 +111,25 @@ class Encounter(object):
     def effect(self, game):
         raise ValueError(f"Programmer Error! Forgot to implement effect for {self.name}")
 
+    def end_turn(self, game):
+        pass
+
     def reward_effect(self, game):
         raise ValueError(f"Programmer Error! Forgot to implement reward_effect for {self.name}")
 
 
 class NullEncounter(Encounter):
-    def __init__(self, game_num):
+    def __init__(self, title, complete_str):
         super().__init__("NullEncounter", "No encounter", "No reward", [])
-        self._game_num = game_num
+        self._title = title
+        self._complete_str = complete_str
         self.completed = False
 
     def __str__(self):
         return "Nothing to see here"
 
     def display_state(self, window):
-        if self._game_num == 7:
-            window.addstr("All horcruxes destroyed!\n", curses.A_BOLD | curses.color_pair(1))
-        else:
-            window.addstr("All encounters completed!\n", curses.A_BOLD | curses.color_pair(1))
+        window.addstr(f"All {self._title} {self._complete_str}!\n", curses.A_BOLD | curses.color_pair(1))
 
     def effect(self, game):
         pass
@@ -167,7 +153,9 @@ class Diary(Horcrux):
     def die_roll_applies(self, game, result):
         if self.completed:
             return False
-        return result == constants.HEART or result == (constants.HEART + constants.HEART) or result == f"{constants.CARD}"
+        return (result == constants.HEART
+            or result == (constants.HEART + constants.HEART)
+            or constants.CARD in result)
 
     def apply_die_roll(self, game, result):
         if not self.die_roll_applies(game, result):
@@ -201,6 +189,8 @@ class Diary(Horcrux):
             game.heroes.choose_hero(
                     game, prompt=f"{self.name}: {hero.name} played 2 allies, choose hero to gain 2{constants.HEART}: ").add_hearts(game, 2)
 
+ENCOUNTERS_BY_NAME['Diary'] = Diary
+
 
 class Ring(Horcrux):
     def __init__(self):
@@ -225,7 +215,7 @@ class Ring(Horcrux):
         game.heroes.active_hero.add_extra_damage_effect(game, self.__extra_effect)
 
     def __extra_effect(self, game, villain, damage):
-        if self.completed or not villain.is_villain():
+        if self.completed or not villain.is_villain:
             return
         self._damaged_villains[villain] += damage
         if self._damaged_villains[villain] >= 2 and villain not in self._used_ability:
@@ -270,6 +260,8 @@ class Ring(Horcrux):
         self._used_ability = True
         game.heroes.active_hero.remove_action(game, 'R')
 
+ENCOUNTERS_BY_NAME['Ring'] = Ring
+
 
 class Locket(Horcrux):
     def __init__(self):
@@ -306,6 +298,9 @@ class Locket(Horcrux):
     def effect(self, game):
         game.heroes.all_heroes.disallow_gaining_tokens_out_of_turn(game)
 
+    def end_turn(self, game):
+        game.heroes.all_heroes.allow_gaining_tokens_out_of_turn(game)
+
     def reward_effect(self, game):
         self._used_ability = False
         game.heroes.active_hero.add_action(game, 'L', "(L)ocket", self.__reward_action)
@@ -328,6 +323,8 @@ class Locket(Horcrux):
         game.roll_slytherin_die()
         self._used_ability = True
         game.heroes.active_hero.remove_action(game, 'L')
+
+ENCOUNTERS_BY_NAME['Locket'] = Locket
 
 
 class Cup(Horcrux):
@@ -387,6 +384,8 @@ class Cup(Horcrux):
         self._used_ability = True
         game.heroes.active_hero.remove_action(game, 'C')
 
+ENCOUNTERS_BY_NAME['Cup'] = Cup
+
 
 class Diadem(Horcrux):
     def __init__(self):
@@ -403,11 +402,11 @@ class Diadem(Horcrux):
             window.addstr("✔", curses.A_BOLD | curses.color_pair(1))
 
     def die_roll_applies(self, game, result):
-        return ((result == f"{constants.CARD}" and not self._got_card) or
+        return ((constants.CARD in result and not self._got_card) or
                 (result == constants.DAMAGE and not self._got_damage)) and not self.completed
 
     def apply_die_roll(self, game, result):
-        if result == constants.CARD:
+        if constants.CARD in result:
             self._got_card = True
         elif result == constants.DAMAGE:
             self._got_damage = True
@@ -418,9 +417,11 @@ class Diadem(Horcrux):
 
     def effect(self, game):
         hero = game.heroes.active_hero
-        types_in_hand = set(type(card) for card in hero._hand)
-        if types_in_hand.issuperset(set([hogwarts.Ally, hogwarts.Item, hogwarts.Spell])):
-            game.log(f"{self.name}: {hero.name} has one ally, item, and spell; loses 2{constants.HEART}")
+        allies = sum(1 for card in hero._hand if card.is_ally())
+        items = sum(1 for card in hero._hand if card.is_item())
+        spells = sum(1 for card in hero._hand if card.is_spell())
+        if allies >= 1 and items >= 1 and spells >= 1:
+            game.log(f"{self.name}: {hero.name} has at least one ally, item, and spell; loses 2{constants.HEART}")
             hero.remove_hearts(game, 2)
 
     def reward_effect(self, game):
@@ -446,6 +447,8 @@ class Diadem(Horcrux):
         self._used_ability = True
         game.heroes.active_hero.remove_action(game, 'D')
 
+ENCOUNTERS_BY_NAME['Diadem'] = Diadem
+
 
 class Nagini(Horcrux):
     def __init__(self):
@@ -469,7 +472,7 @@ class Nagini(Horcrux):
         if self.completed:
             return False
         return ((result == constants.DAMAGE and not self._got_damage) or
-                (result == constants.CARD and not self._got_card) or
+                (constants.CARD in result and not self._got_card) or
                 (result == constants.HEART and not self._got_heart) or
                 (result == (constants.HEART + constants.HEART) and not self._got_heart))
 
@@ -478,7 +481,7 @@ class Nagini(Horcrux):
             raise ValueError(f"Programmer Error! Nagini only applies to {constants.DAMAGE} or {constants.CARD} or {constants.HEART}")
         if result == constants.DAMAGE:
             self._got_damage = True
-        elif result == constants.CARD:
+        elif constants.CARD in result:
             self._got_card = True
         else:
             self._got_heart = True
@@ -488,6 +491,9 @@ class Nagini(Horcrux):
     def effect(self, game):
         game.heroes.active_hero.remove_hearts(game)
         game.heroes.active_hero.disallow_healing(game)
+
+    def end_turn(self, game):
+        game.heroes.active_hero.allow_healing(game)
 
     def reward_effect(self, game):
         game.heroes.active_hero.add_action(game, 'N', "(N)agini", self.__reward_action)
@@ -501,15 +507,7 @@ class Nagini(Horcrux):
         game.heroes.active_hero.remove_action(game, 'N')
         game.locations.remove_control(game, 3)
 
-
-game_seven_horcruxes = [
-    Diary,
-    Ring,
-    Locket,
-    Cup,
-    Diadem,
-    Nagini,
-]
+ENCOUNTERS_BY_NAME['Nagini'] = Nagini
 
 
 class PeskipiksiPesternomi(Encounter):
@@ -554,6 +552,8 @@ class PeskipiksiPesternomi(Encounter):
             game.heroes.choose_hero(
                     game, prompt=f"{self.name}: {hero.name} played EVEN cost card, choose hero to gain 1{constants.HEART}: ").add_hearts(game, 1)
 
+ENCOUNTERS_BY_NAME['Peskipiksi Pesternomi'] = PeskipiksiPesternomi
+
 
 class StudentsOutOfBed(Encounter):
     def __init__(self):
@@ -576,14 +576,14 @@ class StudentsOutOfBed(Encounter):
     def die_roll_applies(self, game, result):
         if self.completed:
             return False
-        return ((result == constants.CARD and not self._got_card) or
+        return ((constants.CARD in result and not self._got_card) or
                 (result == constants.HEART and not self._got_heart) or
                 (result == (constants.HEART + constants.HEART) and not self._got_heart))
 
     def apply_die_roll(self, game, result):
         if not self.die_roll_applies(game, result):
             raise ValueError(f"Programmer Error! Students Out of Bed only applies to {constants.HEART} or {constants.CARD}")
-        if result == constants.CARD:
+        if constants.CARD in result:
             self._got_card = True
         else:
             self._got_heart = True
@@ -611,6 +611,8 @@ class StudentsOutOfBed(Encounter):
         game.heroes.active_hero._encounters.remove(self)
         game.heroes.active_hero.remove_action(game, 'S')
         game.heroes.all_heroes.choose_and_banish(game)
+
+ENCOUNTERS_BY_NAME['Students Out of Bed'] = StudentsOutOfBed
 
 
 class ThirdFloorCorridor(Encounter):
@@ -678,12 +680,7 @@ class ThirdFloorCorridor(Encounter):
         game.heroes.active_hero.remove_action(game, 'T')
         game.villain_deck.last_defeated_villain_reward(game)
 
-
-monster_box_one_encounters = [
-    PeskipiksiPesternomi,
-    StudentsOutOfBed,
-    ThirdFloorCorridor,
-]
+ENCOUNTERS_BY_NAME['Third Floor Corridor'] = ThirdFloorCorridor
 
 
 class UnregisteredAnimagus(Encounter):
@@ -726,6 +723,8 @@ class UnregisteredAnimagus(Encounter):
         game.roll_creature_die()
         game.roll_creature_die()
 
+ENCOUNTERS_BY_NAME['Unregistered Animagus'] = UnregisteredAnimagus
+
 
 class FullMoonRises(Encounter):
     def __init__(self):
@@ -765,6 +764,7 @@ class FullMoonRises(Encounter):
             self._foes_defeated += 1
         if self._foes_defeated >= 3:
             self.completed = True
+            game.locations.remove_control_callback(game, self)
 
     def reward_effect(self, game):
         game.heroes.active_hero.add_action(game, 'F', "(F)ull Moon Rises", self.__reward_action)
@@ -775,6 +775,8 @@ class FullMoonRises(Encounter):
         game.heroes.active_hero.remove_action(game, 'F')
         game.heroes.all_heroes.add_hearts(game, 3)
         game.heroes.all_heroes.choose_and_banish(game)
+
+ENCOUNTERS_BY_NAME['Full Moon Rises'] = FullMoonRises
 
 
 class DefensiveTraining(Encounter):
@@ -820,12 +822,7 @@ class DefensiveTraining(Encounter):
         game.heroes.active_hero.remove_action(game, 'D')
         game.heroes.all_heroes.add(game, influence=2, hearts=2)
 
-
-monster_box_two_encounters = [
-    UnregisteredAnimagus,
-    FullMoonRises,
-    DefensiveTraining,
-]
+ENCOUNTERS_BY_NAME['Defensive Training'] = DefensiveTraining
 
 
 class ForbiddenForest(Encounter):
@@ -853,7 +850,7 @@ class ForbiddenForest(Encounter):
     def die_roll_applies(self, game, result):
         if self.completed:
             return False
-        return ((result == constants.CARD and not self._got_card) or
+        return ((constants.CARD in result and not self._got_card) or
                 (result == constants.INFLUENCE and not self._got_influence) or
                 (result == constants.HEART and not self._got_heart) or
                 (result == (constants.HEART + constants.HEART) and not self._got_heart))
@@ -861,7 +858,7 @@ class ForbiddenForest(Encounter):
     def apply_die_roll(self, game, result):
         if not self.die_roll_applies(game, result):
             raise ValueError(f"Programmer Error! Nagini only applies to {constants.CARD} or {constants.HEART} or {constants.INFLUENCE}")
-        if result == constants.CARD:
+        if constants.CARD in result:
             self._got_card = True
         elif result == constants.INFLUENCE:
             self._got_influence = True
@@ -878,6 +875,8 @@ class ForbiddenForest(Encounter):
 
     def reward_effect(self, game):
         pass
+
+ENCOUNTERS_BY_NAME['Forbidden Forest'] = ForbiddenForest
 
 
 class FilthyHalfBreed(Encounter):
@@ -921,6 +920,8 @@ class FilthyHalfBreed(Encounter):
             hero.draw(game)
             hero.choose_and_banish(game, hand_only=True)
 
+ENCOUNTERS_BY_NAME['Filthy Half-Breed'] = FilthyHalfBreed
+
 
 class Escape(Encounter):
     def __init__(self):
@@ -963,12 +964,7 @@ class Escape(Encounter):
         game.log(f"{self.name} discarded; remove 2{constants.CONTROL}")
         game.locations.remove_control(game, 2)
 
-
-monster_box_three_encounters = [
-    ForbiddenForest,
-    FilthyHalfBreed,
-    Escape,
-]
+ENCOUNTERS_BY_NAME['Escape!'] = Escape
 
 
 class TheFirstTask(Encounter):
@@ -1040,6 +1036,8 @@ class TheFirstTask(Encounter):
         elif choice == "S":
             game.roll_slytherin_die()
 
+ENCOUNTERS_BY_NAME['The First Task'] = TheFirstTask
+
 
 class TheSecondTask(Encounter):
     def __init__(self):
@@ -1084,6 +1082,8 @@ class TheSecondTask(Encounter):
         game.heroes.active_hero.remove_action(game, 'S')
         game.locations.remove_control(game)
         game.heroes.all_heroes.draw(game)
+
+ENCOUNTERS_BY_NAME['The Second Task'] = TheSecondTask
 
 
 class TheThirdTask(Encounter):
@@ -1130,9 +1130,4 @@ class TheThirdTask(Encounter):
         game.locations.remove_control(game)
         game.heroes.all_heroes.add_influence(game, 2)
 
-
-monster_box_four_encounters = [
-    TheFirstTask,
-    TheSecondTask,
-    TheThirdTask,
-]
+ENCOUNTERS_BY_NAME['The Third Task'] = TheThirdTask

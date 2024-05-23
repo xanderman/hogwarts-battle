@@ -7,14 +7,14 @@ import random
 import constants
 
 class VillainDeck(object):
-    def __init__(self, window, game_num, encounters):
+    def __init__(self, window, config, encounters):
         self._window = window
         self._init_window()
         self._pad = curses.newpad(100, 100)
-        self._deck = build_deck(game_num, encounters)
+        self._deck = build_deck(config, encounters)
         self._discard = []
-        self._max = max_villains(game_num)
-        self._voldemort = build_voldemort(game_num)
+        self._max = config['villains_revealed']
+        self._voldemort = VOLDEMORTS_BY_NAME[config['voldemort']]() if config['voldemort'] else None
         self._rewards_allowed = True
 
         random.shuffle(self._deck)
@@ -178,29 +178,20 @@ def max_villains(game_num):
     return 3
 
 
-def build_deck(game_num, encounters):
-    if isinstance(game_num, int):
-        return [v() for villains in BASE_VILLAINS[:game_num] for v in villains]
-    total_villains = VILLAIN_DECK_SIZE[game_num]
+def build_deck(config, encounters):
+    if isinstance(config['villains'], list):
+        return [VILLAINS_BY_NAME[name]() for name in config['villains']]
+    total_villains = config['villains']
     names = set(encounters.required_villains())
     available = list(VILLAINS_BY_NAME.keys())
     while len(names) < total_villains:
         names.add(random.choice(available))
     return [VILLAINS_BY_NAME[name]() for name in names]
 
+
 VILLAINS_BY_NAME = {}
 
-
-def build_voldemort(game_num):
-    if game_num == 5 or game_num == "m1":
-        return GameFiveVoldemort()
-    if game_num == 6 or game_num == "m2":
-        return GameSixVoldemort()
-    if game_num == 7 or game_num == "m3":
-        return GameSevenVoldemort()
-    if game_num == "m4":
-        return MonsterBoxFourVoldemort()
-    return None
+VOLDEMORTS_BY_NAME = {}
 
 
 class Foe(object):
@@ -489,13 +480,6 @@ class Quirrel(Villain):
 VILLAINS_BY_NAME["Quirinus Quirrell"] = Quirrel
 
 
-game_one_villains = [
-    Draco,
-    Crabbe,
-    Quirrel,
-]
-
-
 class Lucius(Villain):
     def __init__(self):
         super().__init__(
@@ -608,13 +592,6 @@ class TomRiddle(Villain):
 VILLAINS_BY_NAME["Tom Riddle"] = TomRiddle
 
 
-game_two_villains = [
-    Lucius,
-    Basilisk,
-    TomRiddle,
-]
-
-
 class Dementor(VillainCreature):
     def __init__(self):
         super().__init__(
@@ -673,11 +650,6 @@ class PeterPettigrew(Villain):
 VILLAINS_BY_NAME["Peter Pettigrew"] = PeterPettigrew
 
 
-game_three_villains = [
-    Dementor,
-    PeterPettigrew,
-]
-
 class DeathEater(Villain):
     def __init__(self):
         super().__init__(
@@ -694,10 +666,11 @@ class DeathEater(Villain):
         game.locations.remove_control(game)
 
 VILLAINS_BY_NAME["Death Eater"] = DeathEater
+# This makes 2 Death Eaters available for games with random villains
 VILLAINS_BY_NAME["Death Eater 2"] = DeathEater
 
 
-class BartyCrouch(Villain):
+class BartyCrouchJr(Villain):
     def __init__(self):
         super().__init__(
                 "Barty Crouch Jr.",
@@ -723,13 +696,8 @@ class BartyCrouch(Villain):
     def _reward(self, game):
         game.locations.remove_control(game, 2)
 
-VILLAINS_BY_NAME["Barty Crouch Jr."] = BartyCrouch
+VILLAINS_BY_NAME["Barty Crouch Jr."] = BartyCrouchJr
 
-
-game_four_villains = [
-    DeathEater,
-    BartyCrouch,
-]
 
 class Umbridge(Villain):
     def __init__(self):
@@ -761,11 +729,6 @@ class Umbridge(Villain):
 
 VILLAINS_BY_NAME["Dolores Umbridge"] = Umbridge
 
-game_five_villains = [
-    Umbridge,
-    DeathEater,
-]
-
 
 class GameFiveVoldemort(Villain):
     def __init__(self):
@@ -780,6 +743,8 @@ class GameFiveVoldemort(Villain):
 
     def _reward(self, game):
         pass
+
+VOLDEMORTS_BY_NAME["Game Five Voldemort"] = GameFiveVoldemort
 
 
 class BellatrixLestrange(Villain):
@@ -844,12 +809,6 @@ class FenrirGreyback(Villain):
 VILLAINS_BY_NAME["Fenrir Greyback"] = FenrirGreyback
 
 
-game_six_villains = [
-    BellatrixLestrange,
-    FenrirGreyback,
-]
-
-
 class GameSixVoldemort(Villain):
     def __init__(self):
         super().__init__(
@@ -879,8 +838,8 @@ class GameSixVoldemort(Villain):
     def _reward(self, game):
         pass
 
-game_seven_villains = [
-]
+VOLDEMORTS_BY_NAME["Game Six Voldemort"] = GameSixVoldemort
+
 
 class GameSevenVoldemort(Villain):
     def __init__(self):
@@ -912,16 +871,7 @@ class GameSevenVoldemort(Villain):
     def _reward(self, game):
         pass
 
-
-BASE_VILLAINS = [
-    game_one_villains,
-    game_two_villains,
-    game_three_villains,
-    game_four_villains,
-    game_five_villains,
-    game_six_villains,
-    game_seven_villains,
-]
+VOLDEMORTS_BY_NAME["Game Seven Voldemort"] = GameSevenVoldemort
 
 
 class CornishPixies(Creature):
@@ -1498,15 +1448,4 @@ class MonsterBoxFourVoldemort(Villain):
     def _reward(self, game):
         pass
 
-
-# Plus voldemort!
-VILLAIN_DECK_SIZE = {
-    "m1": 11,
-    "m2": 11,
-    "m3": 12,
-    "m4": 14,
-    "p1": 0,
-    "p2": 0,
-    "p3": 0,
-    "p4": 0,
-}
+VOLDEMORTS_BY_NAME["Monster Box Four Voldemort"] = MonsterBoxFourVoldemort

@@ -1,0 +1,131 @@
+name: "Game 4"
+hero_abilities: 3
+proficiencies: No
+encounters: No
+locations:
+  - Quidditch World Cup
+  - Triwizard Tournament
+  - Graveyard
+dark_arts_deck:
+  - Petrification
+  - Petrification
+  - Expulso
+  - Expulso
+  - Expulso
+  - He Who Must Not Be Named
+  - He Who Must Not Be Named
+  - He Who Must Not Be Named
+  - Flipendo
+  - Flipendo
+  - Hand of Glory
+  - Hand of Glory
+  - Relashio
+  - Poison
+  - Obliviate
+  - Dementor's Kiss
+  - Dementor's Kiss
+  - Opugno
+  - Tarantallegra
+  - Morsmordre
+  - Morsmordre
+  - Regeneration
+  - Imperio
+  - Avada Kedavra
+  - Heir of Slytherin
+  - Heir of Slytherin
+  - Crucio
+villains_deck:
+  villains:
+    - Draco Malfoy
+    - Crabbe & Goyle
+    - Quirinus Quirrell
+    - Lucius Malfoy
+    - Basilisk
+    - Tom Riddle
+    - Dementor
+    - Peter Pettigrew
+    - Death Eater
+    - Barty Crouch Jr.
+  villains_revealed: 2
+  voldemort: No
+hogwarts_deck:
+  - Wingardium Leviosa
+  - Wingardium Leviosa
+  - Wingardium Leviosa
+  - Reparo
+  - Reparo
+  - Reparo
+  - Reparo
+  - Reparo
+  - Reparo
+  - Lumos
+  - Lumos
+  - Incendio
+  - Incendio
+  - Incendio
+  - Incendio
+  - Descendo
+  - Descendo
+  - Essence of Dittany
+  - Essence of Dittany
+  - Essence of Dittany
+  - Essence of Dittany
+  - Quidditch Gear
+  - Quidditch Gear
+  - Quidditch Gear
+  - Quidditch Gear
+  - Sorting Hat
+  - Golden Snitch
+  - Oliver Wood
+  - Rubeus Hagrid
+  - Albus Dumbledore
+  - Finite
+  - Finite
+  - Expelliarmus
+  - Expelliarmus
+  - Polyjuice Potion
+  - Polyjuice Potion
+  - Nimbus 2001
+  - Nimbus 2001
+  - Fawkes
+  - Molly Weasley
+  - Dobby
+  - Arthur Weasley
+  - Gilderoy Lockhart
+  - Ginny Weasley
+  - Expecto Patronum
+  - Expecto Patronum
+  - Petrificus Totalus
+  - Petrificus Totalus
+  - Chocolate Frog
+  - Chocolate Frog
+  - Chocolate Frog
+  - Butterbeer
+  - Butterbeer
+  - Butterbeer
+  - Crystal Ball
+  - Crystal Ball
+  - Marauder's Map
+  - Remus Lupin
+  - Sybill Trelawney
+  - Accio
+  - Accio
+  - Protego
+  - Protego
+  - Protego
+  - "Hogwarts: A History"
+  - "Hogwarts: A History"
+  - "Hogwarts: A History"
+  - "Hogwarts: A History"
+  - "Hogwarts: A History"
+  - "Hogwarts: A History"
+  - Pensieve
+  - Triwizard Cup
+  - Severus Snape
+  - Fleur Delacour
+  - Filius Flitwick
+  - Cedric Diggory
+  - Viktor Krum
+  - Mad-eye Moody
+  - Minerva McGonagall
+  - Pomona Sprout

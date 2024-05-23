@@ -7,16 +7,12 @@ import random
 import constants
 
 class DarkArtsDeck(object):
-    def __init__(self, window, game_num):
+    def __init__(self, window, chosen_cards):
         self._window = window
         self._init_window()
         self._pad = curses.newpad(100, 100)
 
-        if isinstance(game_num, int):
-            self._deck = reduce(operator.add, CARDS[:game_num])
-        elif game_num[0] == 'm':
-            self._deck = reduce(operator.add, CARDS)
-            self._deck.extend(reduce(operator.add, MONSTER_BOX_CARDS[:int(game_num[1])]))
+        self._deck = [CARDS_BY_NAME[card_name]() for card_name in chosen_cards]
         random.shuffle(self._deck)
         self._discard = []
         self._played = []
@@ -84,6 +80,9 @@ class DarkArtsDeck(object):
         self._played = []
 
 
+CARDS_BY_NAME = {}
+
+
 class DarkArtsCard(object):
     def __init__(self, name, description):
         self.name = name
@@ -116,6 +115,8 @@ class Petrification(DarkArtsCard):
     def _end_turn(self, game):
         game.heroes.allow_drawing(game)
 
+CARDS_BY_NAME['Petrification'] = Petrification
+
 
 class Expulso(DarkArtsCard):
     def __init__(self):
@@ -125,6 +126,8 @@ class Expulso(DarkArtsCard):
 
     def _effect(self, game):
         game.heroes.active_hero.remove_hearts(game, 2)
+
+CARDS_BY_NAME['Expulso'] = Expulso
 
 
 class HeWhoMustNotBeNamed(DarkArtsCard):
@@ -136,6 +139,8 @@ class HeWhoMustNotBeNamed(DarkArtsCard):
     def _effect(self, game):
         game.locations.add_control(game)
 
+CARDS_BY_NAME['He Who Must Not Be Named'] = HeWhoMustNotBeNamed
+
 
 class Flipendo(DarkArtsCard):
     def __init__(self):
@@ -146,19 +151,8 @@ class Flipendo(DarkArtsCard):
     def _effect(self, game):
         game.heroes.active_hero.add(game, hearts=-1, cards=-1)
 
+CARDS_BY_NAME['Flipendo'] = Flipendo
 
-game_one_cards = [
-    Petrification(),
-    Petrification(),
-    Expulso(),
-    Expulso(),
-    Expulso(),
-    HeWhoMustNotBeNamed(),
-    HeWhoMustNotBeNamed(),
-    HeWhoMustNotBeNamed(),
-    Flipendo(),
-    Flipendo(),
-]
 
 class HandOfGlory(DarkArtsCard):
     def __init__(self):
@@ -169,6 +163,8 @@ class HandOfGlory(DarkArtsCard):
     def _effect(self, game):
         game.heroes.active_hero.remove_hearts(game, 1)
         game.locations.add_control(game)
+
+CARDS_BY_NAME['Hand of Glory'] = HandOfGlory
 
 
 class Relashio(DarkArtsCard):
@@ -203,6 +199,8 @@ class Relashio(DarkArtsCard):
             hero.discard(game, choice)
             break
 
+CARDS_BY_NAME['Relashio'] = Relashio
+
 
 class Poison(DarkArtsCard):
     def __init__(self):
@@ -235,6 +233,8 @@ class Poison(DarkArtsCard):
                 continue
             hero.discard(game, choice)
             break
+
+CARDS_BY_NAME['Poison'] = Poison
 
 
 class Obliviate(DarkArtsCard):
@@ -269,14 +269,7 @@ class Obliviate(DarkArtsCard):
             hero.discard(game, choice)
             break
 
-
-game_two_cards = [
-    HandOfGlory(),
-    HandOfGlory(),
-    Relashio(),
-    Poison(),
-    Obliviate(),
-]
+CARDS_BY_NAME['Obliviate'] = Obliviate
 
 
 class DementorsKiss(DarkArtsCard):
@@ -288,6 +281,8 @@ class DementorsKiss(DarkArtsCard):
     def _effect(self, game):
         game.heroes.active_hero.remove_hearts(game, 2)
         game.heroes.all_heroes_except_active.remove_hearts(game, 1)
+
+CARDS_BY_NAME["Dementor's Kiss"] = DementorsKiss
 
 
 class Opugno(DarkArtsCard):
@@ -309,6 +304,8 @@ class Opugno(DarkArtsCard):
             hero.discard_top_card(game)
             hero.remove_hearts(game, 2)
 
+CARDS_BY_NAME['Opugno'] = Opugno
+
 
 class Tarantallegra(DarkArtsCard):
     def __init__(self):
@@ -322,13 +319,7 @@ class Tarantallegra(DarkArtsCard):
         for villain in game.villain_deck.all_villains:
             villain._max_damage_per_turn = 1
 
-
-game_three_cards = [
-    DementorsKiss(),
-    DementorsKiss(),
-    Opugno(),
-    Tarantallegra(),
-]
+CARDS_BY_NAME['Tarantallegra'] = Tarantallegra
 
 
 class Morsmordre(DarkArtsCard):
@@ -344,6 +335,8 @@ class Morsmordre(DarkArtsCard):
         game.heroes.all_heroes.remove_hearts(game, 1 + death_eaters)
         game.locations.add_control(game)
 
+CARDS_BY_NAME['Morsmordre'] = Morsmordre
+
 
 class Regeneration(DarkArtsCard):
     def __init__(self):
@@ -353,6 +346,8 @@ class Regeneration(DarkArtsCard):
 
     def _effect(self, game):
         game.villain_deck.all_villains.remove_damage(game, 2)
+
+CARDS_BY_NAME['Regeneration'] = Regeneration
 
 
 class Imperio(DarkArtsCard):
@@ -365,6 +360,8 @@ class Imperio(DarkArtsCard):
         game.heroes.choose_hero(game, prompt=f"Choose hero to lose 2{constants.HEART}: ",
                                 disallow=game.heroes.active_hero).remove_hearts(game, 2)
         game.dark_arts_deck.play(game, 1)
+
+CARDS_BY_NAME['Imperio'] = Imperio
 
 
 class AvadaKedavra(DarkArtsCard):
@@ -381,6 +378,8 @@ class AvadaKedavra(DarkArtsCard):
             game.log(f"Stunned by Avada Kedavra! Adding another {constants.CONTROL}")
             game.locations.add_control(game)
         game.dark_arts_deck.play(game, 1)
+
+CARDS_BY_NAME['Avada Kedavra'] = AvadaKedavra
 
 
 class HeirOfSlytherin(DarkArtsCard):
@@ -407,6 +406,8 @@ class HeirOfSlytherin(DarkArtsCard):
             game.log(f"Rolled {constants.CARD}, ALL heroes discard a card")
             game.heroes.all_heroes.choose_and_discard(game)
 
+CARDS_BY_NAME['Heir of Slytherin'] = HeirOfSlytherin
+
 
 class Crucio(DarkArtsCard):
     def __init__(self):
@@ -418,17 +419,7 @@ class Crucio(DarkArtsCard):
         game.heroes.active_hero.remove_hearts(game, 1)
         game.dark_arts_deck.play(game, 1)
 
-
-game_four_cards = [
-    Morsmordre(),
-    Morsmordre(),
-    Regeneration(),
-    Imperio(),
-    AvadaKedavra(),
-    HeirOfSlytherin(),
-    HeirOfSlytherin(),
-    Crucio(),
-]
+CARDS_BY_NAME['Crucio'] = Crucio
 
 
 class EducationalDecree(DarkArtsCard):
@@ -440,6 +431,8 @@ class EducationalDecree(DarkArtsCard):
     def _effect(self, game):
         total = sum(1 for card in game.heroes.active_hero._hand if card.cost >= 4)
         game.heroes.active_hero.remove_hearts(game, total)
+
+CARDS_BY_NAME['Educational Decree'] = EducationalDecree
 
 
 class Legilimency(DarkArtsCard):
@@ -461,16 +454,7 @@ class Legilimency(DarkArtsCard):
             hero.discard_top_card(game)
             hero.remove_hearts(game, 2)
 
-
-game_five_cards = [
-    EducationalDecree(),
-    EducationalDecree(),
-    Legilimency(),
-    Morsmordre(),
-    Imperio(),
-    AvadaKedavra(),
-    Crucio(),
-]
+CARDS_BY_NAME['Legilimency'] = Legilimency
 
 
 class Sectumsempra(DarkArtsCard):
@@ -489,12 +473,7 @@ class Sectumsempra(DarkArtsCard):
     def _end_turn(self, game):
         game.heroes.allow_healing(game)
 
-
-game_six_cards = [
-    Sectumsempra(),
-    Sectumsempra(),
-    Morsmordre(),
-]
+CARDS_BY_NAME['Sectumsempra'] = Sectumsempra
 
 
 class Fiendfyre(DarkArtsCard):
@@ -506,23 +485,7 @@ class Fiendfyre(DarkArtsCard):
     def _effect(self, game):
         game.heroes.all_heroes.remove_hearts(game, 3)
 
-
-game_seven_cards = [
-    Fiendfyre(),
-    Imperio(),
-    AvadaKedavra(),
-    Crucio(),
-]
-
-CARDS = [
-    game_one_cards,
-    game_two_cards,
-    game_three_cards,
-    game_four_cards,
-    game_five_cards,
-    game_six_cards,
-    game_seven_cards,
-]
+CARDS_BY_NAME['Fiendfyre'] = Fiendfyre
 
 
 class MenacingGrowl(DarkArtsCard):
@@ -538,6 +501,8 @@ class MenacingGrowl(DarkArtsCard):
         total = sum(1 for card in hero._hand if card.cost == 3)
         game.log(f"Menacing Growl: {hero.name} has {total} cards with cost 3{constants.INFLUENCE}")
         hero.remove_hearts(game, total)
+
+CARDS_BY_NAME['Menacing Growl'] = MenacingGrowl
 
 
 class IngquisitorialSquad(DarkArtsCard):
@@ -555,6 +520,8 @@ class IngquisitorialSquad(DarkArtsCard):
         game.log(f"Inquisitorial Squad: {hero.name} has {total} Detention! cards")
         hero.remove_hearts(game, total)
 
+CARDS_BY_NAME['Inquisitorial Squad'] = IngquisitorialSquad
+
 
 class RagingTroll(DarkArtsCard):
     def __init__(self):
@@ -565,6 +532,8 @@ class RagingTroll(DarkArtsCard):
     def _effect(self, game):
         game.heroes.next_hero.remove_hearts(game, 2)
         game.locations.add_control(game)
+
+CARDS_BY_NAME['Raging Troll'] = RagingTroll
 
 
 class SlugulusEructo(DarkArtsCard):
@@ -578,6 +547,8 @@ class SlugulusEructo(DarkArtsCard):
         game.log(f"Slugulus Eructo: {total} Creatures in play")
         game.heroes.all_heroes.remove_hearts(game, total)
 
+CARDS_BY_NAME['Slugulus Eructo'] = SlugulusEructo
+
 
 class BlastEnded(DarkArtsCard):
     def __init__(self):
@@ -588,17 +559,7 @@ class BlastEnded(DarkArtsCard):
     def _effect(self, game):
         game.heroes.previous_hero.add(game, hearts=-1, cards=-1)
 
-
-monster_box_one_cards = [
-    MenacingGrowl(),
-    MenacingGrowl(),
-    IngquisitorialSquad(),
-    IngquisitorialSquad(),
-    RagingTroll(),
-    RagingTroll(),
-    SlugulusEructo(),
-    BlastEnded(),
-]
+CARDS_BY_NAME['Blast-ended'] = BlastEnded
 
 
 class TheGrim(DarkArtsCard):
@@ -611,6 +572,8 @@ class TheGrim(DarkArtsCard):
         game.heroes.active_hero.choose_and_discard(game)
         game.locations.add_control(game)
 
+CARDS_BY_NAME['The Grim'] = TheGrim
+
 
 class Transformed(DarkArtsCard):
     def __init__(self):
@@ -621,6 +584,8 @@ class Transformed(DarkArtsCard):
     def _effect(self, game):
         game.heroes.active_hero.choose_and_discard(game)
         game.heroes.active_hero.add_detention(game, to_hand=True)
+
+CARDS_BY_NAME['Transformed'] = Transformed
 
 
 class ViciousBite(DarkArtsCard):
@@ -642,6 +607,8 @@ class ViciousBite(DarkArtsCard):
             game.log(f"Vicious Bite: Adding another {constants.CONTROL}")
             game.locations.add_control(game)
 
+CARDS_BY_NAME['Vicious Bite'] = ViciousBite
+
 
 class Bombarda(DarkArtsCard):
     def __init__(self):
@@ -652,16 +619,7 @@ class Bombarda(DarkArtsCard):
     def _effect(self, game):
         game.heroes.all_heroes.add_detention(game)
 
-
-monster_box_two_cards = [
-    TheGrim(),
-    Transformed(),
-    Transformed(),
-    ViciousBite(),
-    ViciousBite(),
-    Bombarda(),
-    Bombarda(),
-]
+CARDS_BY_NAME['Bombarda!'] = Bombarda
 
 
 class CentaurAttack(DarkArtsCard):
@@ -679,6 +637,8 @@ class CentaurAttack(DarkArtsCard):
         if spells >= 3:
             hero.remove_hearts(game, 1)
 
+CARDS_BY_NAME['Centaur Attack'] = CentaurAttack
+
 
 class FightAndFlight(DarkArtsCard):
     def __init__(self):
@@ -688,6 +648,8 @@ class FightAndFlight(DarkArtsCard):
 
     def _effect(self, game):
         game.locations.add_control(game, 2)
+
+CARDS_BY_NAME['Fight and Flight'] = FightAndFlight
 
 
 class AcromantulaAttack(DarkArtsCard):
@@ -708,6 +670,8 @@ class AcromantulaAttack(DarkArtsCard):
         if card.cost == 0:
             hero.discard_top_card(game)
             hero.remove_hearts(game, 1)
+
+CARDS_BY_NAME['Acromantula Attack'] = AcromantulaAttack
 
 
 class SeriouslyMisunderstoodCreatures(DarkArtsCard):
@@ -735,17 +699,7 @@ class SeriouslyMisunderstoodCreatures(DarkArtsCard):
             game.log(f"Rolled {constants.CARD}, ALL heroes discard a card")
             game.heroes.all_heroes.choose_and_discard(game)
 
-
-monster_box_three_cards = [
-    CentaurAttack(),
-    CentaurAttack(),
-    FightAndFlight(),
-    AcromantulaAttack(),
-    AcromantulaAttack(),
-    SeriouslyMisunderstoodCreatures(),
-    SeriouslyMisunderstoodCreatures(),
-    Bombarda(),
-]
+CARDS_BY_NAME['Seriously Misunderstood Creatures'] = SeriouslyMisunderstoodCreatures
 
 
 class DragonsBreath(DarkArtsCard):
@@ -758,6 +712,8 @@ class DragonsBreath(DarkArtsCard):
         game.heroes.active_hero.remove_hearts(game, 1)
         game.heroes.active_hero.discard_all_items(game)
 
+CARDS_BY_NAME["Dragon's Breath"] = DragonsBreath
+
 
 class LeprechaunGold(DarkArtsCard):
     def __init__(self):
@@ -769,18 +725,4 @@ class LeprechaunGold(DarkArtsCard):
         game.heroes.all_heroes.remove_all_damage(game)
         game.heroes.all_heroes.remove_all_influence(game)
 
-
-monster_box_four_cards = [
-    DragonsBreath(),
-    IngquisitorialSquad(),
-    LeprechaunGold(),
-    LeprechaunGold(),
-    LeprechaunGold(),
-]
-
-MONSTER_BOX_CARDS = [
-    monster_box_one_cards,
-    monster_box_two_cards,
-    monster_box_three_cards,
-    monster_box_four_cards,
-]
+CARDS_BY_NAME['Leprechaun Gold'] = LeprechaunGold

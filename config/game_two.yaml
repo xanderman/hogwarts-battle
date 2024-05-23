@@ -1,0 +1,79 @@
+name: "Game 2"
+hero_abilities: No
+proficiencies: No
+encounters: No
+locations:
+  - Forbidden Forest
+  - Quidditch Pitch
+  - Chamber of Secrets
+dark_arts_deck:
+  - Petrification
+  - Petrification
+  - Expulso
+  - Expulso
+  - Expulso
+  - He Who Must Not Be Named
+  - He Who Must Not Be Named
+  - He Who Must Not Be Named
+  - Flipendo
+  - Flipendo
+  - Hand of Glory
+  - Hand of Glory
+  - Relashio
+  - Poison
+  - Obliviate
+villains_deck:
+  villains:
+    - Draco Malfoy
+    - Crabbe & Goyle
+    - Quirinus Quirrell
+    - Lucius Malfoy
+    - Basilisk
+    - Tom Riddle
+  villains_revealed: 1
+  voldemort: No
+hogwarts_deck:
+  - Wingardium Leviosa
+  - Wingardium Leviosa
+  - Wingardium Leviosa
+  - Reparo
+  - Reparo
+  - Reparo
+  - Reparo
+  - Reparo
+  - Reparo
+  - Lumos
+  - Lumos
+  - Incendio
+  - Incendio
+  - Incendio
+  - Incendio
+  - Descendo
+  - Descendo
+  - Essence of Dittany
+  - Essence of Dittany
+  - Essence of Dittany
+  - Essence of Dittany
+  - Quidditch Gear
+  - Quidditch Gear
+  - Quidditch Gear
+  - Quidditch Gear
+  - Sorting Hat
+  - Golden Snitch
+  - Oliver Wood
+  - Rubeus Hagrid
+  - Albus Dumbledore
+  - Finite
+  - Finite
+  - Expelliarmus
+  - Expelliarmus
+  - Polyjuice Potion
+  - Polyjuice Potion
+  - Nimbus 2001
+  - Nimbus 2001
+  - Fawkes
+  - Molly Weasley
+  - Dobby
+  - Arthur Weasley
+  - Gilderoy Lockhart
+  - Ginny Weasley

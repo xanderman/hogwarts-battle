@@ -3,15 +3,13 @@ import curses
 import constants
 
 class Locations(object):
-    def __init__(self, window, game_num):
+    # def __init__(self, window, game_num):
+    def __init__(self, window, game_locations, num_heroes):
         self._window = window
         self._init_window()
         self._pad = curses.newpad(100, 100)
 
-        if isinstance(game_num, int):
-            self._locations = LOCATIONS[game_num]
-        elif game_num[0] == 'm':
-            self._locations = MONSTER_BOX_LOCATIONS[int(game_num[1])]
+        self._locations = [LOCATIONS_BY_NAME[l](num_heroes) for l in game_locations]
         self._current = 0
         self._control_callbacks = []
         # simple ref counter of reasons why control cannot be removed
@@ -81,12 +79,11 @@ class Locations(object):
 
 
 class Location(object):
-    def __init__(self, name, dark_arts_count, control_max, desc="", reveal_effect=lambda game: None, action=None):
+    def __init__(self, name, dark_arts_count, control_max, desc="", action=None):
         self.name = name
         self.dark_arts_count = dark_arts_count
         self._control_max = control_max
         self.desc = desc
-        self._reveal_effect = reveal_effect
         self.action = action
 
         self._control = 0
@@ -97,6 +94,9 @@ class Location(object):
     def _reveal(self, game):
         game.log(f"Moving to location {self.name}! {self.desc}")
         self._reveal_effect(game)
+
+    def _reveal_effect(self, game):
+        pass
 
     def _add_control(self, game, amount, callbacks):
         control_start = self._control
@@ -117,171 +117,423 @@ class Location(object):
         return self._control == self._control_max
 
 
-game_one_locations = [
-    Location("Diagon Alley", 1, 4),
-    Location("Mirror of Erised", 1, 4),
-]
+LOCATIONS_BY_NAME = {}
 
-game_two_locations = [
-    Location("Forbidden Forest", 1, 4),
-    Location("Quidditch Pitch", 1, 4),
-    Location("Chamber of Secrets", 2, 5),
-]
 
-game_three_locations = [
-    Location("Hogwarts Express", 1, 5),
-    Location("Hogsmeade Village", 2, 6),
-    Location("Shrieking Shack", 2, 6),
-]
+class DiagonAlley(Location):
+    def __init__(self, _):
+        super().__init__("Diagon Alley", 1, 4)
 
-def graveyard_effect(game, hero):
-    allies = sum(1 for card in hero._hand if card.is_ally())
-    if allies == 0:
-        game.log(f"{hero.name} has no allies to discard, safe!")
-        return
-    while True:
-        choice = int(game.input(f"Choose an ally for {hero.name} to discard: ", range(len(hero._hand))))
-        card = hero._hand[choice]
-        if not card.is_ally():
-            game.log(f"{card.name} is not an ally!")
-            continue
-        hero.discard(game, choice)
-        break
+LOCATIONS_BY_NAME["Diagon Alley"] = DiagonAlley
 
-game_four_locations = [
-    Location("Quidditch World Cup", 1, 6),
-    Location("Triwizard Tournament", 2, 6),
-    Location("Graveyard", 2, 7, "ALL heroes discard an ally", lambda game: game.heroes.all_heroes.effect(game, graveyard_effect)),
-]
 
-def ministry_effect(game, hero):
-    spells = sum(1 for card in hero._hand if card.is_spell())
-    if spells == 0:
-        game.log(f"{hero.name} has no spells to discard, safe!")
-        return
-    while True:
-        choice = int(game.input(f"Choose a spell for {hero.name} to discard: ", range(len(hero._hand))))
-        card = hero._hand[choice]
-        if not card.is_spell():
-            game.log(f"{card.name} is not a spell!")
-            continue
-        hero.discard(game, choice)
-        break
+class MirrorOfErised(Location):
+    def __init__(self, _):
+        super().__init__("Mirror of Erised", 1, 4)
 
-game_five_locations = [
-    Location("Azkaban", 1, 7),
-    Location("Hall of Prophecy", 2, 7),
-    Location("Ministry of Magic", 2, 7, "ALL heroes discard a spell", lambda game: game.heroes.all_heroes.effect(game, ministry_effect)),
-]
+LOCATIONS_BY_NAME["Mirror of Erised"] = MirrorOfErised
 
-def tower_effect(game, hero):
-    items = sum(1 for card in hero._hand if card.is_item())
-    if items == 0:
-        game.log(f"{hero.name} has no items to discard, safe!")
-        return
-    while True:
-        choice = int(game.input(f"Choose an item for {hero.name} to discard: ", range(len(hero._hand))))
-        card = hero._hand[choice]
-        if not card.is_item():
-            game.log(f"{card.name} is not an item!")
-            continue
-        hero.discard(game, choice)
-        break
 
-game_six_locations = [
-    Location("Knockturn Alley", 1, 7),
-    Location("The Burrow", 2, 7),
-    Location("Astronomy Tower", 3, 8, "ALL heroes discard an item", lambda game: game.heroes.all_heroes.effect(game, tower_effect)),
-]
+class ForbiddenForest(Location):
+    def __init__(self, _):
+        super().__init__("Forbidden Forest", 1, 4)
 
-def castle_effect(game):
-    game.heroes.all_heroes.remove_hearts(game, 2)
+LOCATIONS_BY_NAME["Forbidden Forest"] = ForbiddenForest
 
-def castle_action(game):
-    if game.heroes.active_hero._damage_tokens < 5:
-        game.log(f"Not enough {constants.DAMAGE} to use Hogwarts Castle")
-        return
-    game.heroes.active_hero.remove_damage(game, 5)
-    game.locations.remove_control(game)
 
-game_seven_locations = [
-    Location("Godric's Hollow", 1, 6),
-    Location("Gringotts", 2, 6),
-    Location("Room of Requirement", 2, 7),
-    Location("Hogwarts Castle", 3, 8, f"ALL heroes lose 2{constants.HEART}, may spend 5{constants.DAMAGE} to remove 1{constants.CONTROL}", castle_effect, ('H', "(H)ogwarts Castle", castle_action)),
-]
+class QuidditchPitch(Location):
+    def __init__(self, _):
+        super().__init__("Quidditch Pitch", 1, 4)
 
-LOCATIONS = [
-    -1,
-    game_one_locations,
-    game_two_locations,
-    game_three_locations,
-    game_four_locations,
-    game_five_locations,
-    game_six_locations,
-    game_seven_locations,
-]
+LOCATIONS_BY_NAME["Quidditch Pitch"] = QuidditchPitch
 
-monster_box_one_locations = [
-    Location("Castle Gates", 1, 5),
-    Location("Hagrid's Hut", 2, 6),
-    Location("Great Hall", 3, 7),
-]
 
-monster_box_two_locations = [
-    Location("D.A.D.A. Classroom", 1, 6),
-    Location("Castle Hallways", 2, 6),
-    Location("Whomping Willow", 3, 7),
-]
+class ChamberOfSecrets(Location):
+    def __init__(self, _):
+        super().__init__("Chamber of Secrets", 2, 5)
 
-monster_box_three_locations = [
-    Location("Unicorn Hollow", 1, 5),
-    Location("Aragog's Lair", 2, 6),
-    Location("Giant Clearing", 3, 7),
-]
+LOCATIONS_BY_NAME["Chamber of Secrets"] = ChamberOfSecrets
 
-def triwizard_maze_effect(game):
-    game.villain_deck.all_creatures.remove_damage(game, 1)
-    game.villain_deck.all_creatures.remove_influence(game, 1)
 
-monster_box_four_locations = [
-    Location("Selection of Champions", 1, 5),
-    Location("Dragon Arena", 2, 6),
-    Location("Mermaid Village", 2, 6),
-    Location("Triwizard Maze", 3, 7, f"Remove 1{constants.DAMAGE} and 1{constants.INFLUENCE} from ALL Creatures", triwizard_maze_effect),
-]
+class HogwartsExpress(Location):
+    def __init__(self, _):
+        super().__init__("Hogwarts Express", 1, 5)
 
-MONSTER_BOX_LOCATIONS = [
-    -1,
-    monster_box_one_locations,
-    monster_box_two_locations,
-    monster_box_three_locations,
-    monster_box_four_locations,
-]
+LOCATIONS_BY_NAME["Hogwarts Express"] = HogwartsExpress
+
+
+class HogsmeadeVillage(Location):
+    def __init__(self, _):
+        super().__init__("Hogsmeade Village", 2, 6)
+
+LOCATIONS_BY_NAME["Hogsmeade Village"] = HogsmeadeVillage
+
+
+class ShriekingShack(Location):
+    def __init__(self, _):
+        super().__init__("Shrieking Shack", 2, 6)
+
+LOCATIONS_BY_NAME["Shrieking Shack"] = ShriekingShack
+
+
+class QuidditchWorldCup(Location):
+    def __init__(self, _):
+        super().__init__("Quidditch World Cup", 1, 6)
+
+LOCATIONS_BY_NAME["Quidditch World Cup"] = QuidditchWorldCup
+
+
+class TriwizardTournament(Location):
+    def __init__(self, _):
+        super().__init__("Triwizard Tournament", 2, 6)
+
+LOCATIONS_BY_NAME["Triwizard Tournament"] = TriwizardTournament
+
+
+class Graveyard(Location):
+    def __init__(self, _):
+        super().__init__("Graveyard", 2, 7, "ALL heroes discard an ally")
+
+    def _reveal_effect(self, game):
+        game.heroes.all_heroes.effect(game, self.__per_hero)
+
+    def __per_hero(self, game, hero):
+        allies = sum(1 for card in hero._hand if card.is_ally())
+        if allies == 0:
+            game.log(f"{hero.name} has no allies to discard, safe!")
+            return
+        while True:
+            choice = int(game.input(f"Choose an ally for {hero.name} to discard: ", range(len(hero._hand))))
+            card = hero._hand[choice]
+            if not card.is_ally():
+                game.log(f"{card.name} is not an ally!")
+                continue
+            hero.discard(game, choice)
+            break
+
+LOCATIONS_BY_NAME["Graveyard"] = Graveyard
+
+
+class Azkaban(Location):
+    def __init__(self, _):
+        super().__init__("Azkaban", 1, 7)
+
+LOCATIONS_BY_NAME["Azkaban"] = Azkaban
+
+
+class HallOfProphecy(Location):
+    def __init__(self, _):
+        super().__init__("Hall of Prophecy", 2, 7)
+
+LOCATIONS_BY_NAME["Hall of Prophecy"] = HallOfProphecy
+
+
+class MinistryOfMagic(Location):
+    def __init__(self, _):
+        super().__init__("Ministry of Magic", 2, 7, "ALL heroes discard a spell")
+
+    def _reveal_effect(self, game):
+        game.heroes.all_heroes.effect(game, self.__per_hero)
+
+    def __per_hero(self, game, hero):
+        spells = sum(1 for card in hero._hand if card.is_spell())
+        if spells == 0:
+            game.log(f"{hero.name} has no spells to discard, safe!")
+            return
+        while True:
+            choice = int(game.input(f"Choose a spell for {hero.name} to discard: ", range(len(hero._hand))))
+            card = hero._hand[choice]
+            if not card.is_spell():
+                game.log(f"{card.name} is not a spell!")
+                continue
+            hero.discard(game, choice)
+            break
+
+LOCATIONS_BY_NAME["Ministry of Magic"] = MinistryOfMagic
+
+
+class KnockturnAlley(Location):
+    def __init__(self, _):
+        super().__init__("Knockturn Alley", 1, 7)
+
+LOCATIONS_BY_NAME["Knockturn Alley"] = KnockturnAlley
+
+
+class TheBurrow(Location):
+    def __init__(self, _):
+        super().__init__("The Burrow", 2, 7)
+
+LOCATIONS_BY_NAME["The Burrow"] = TheBurrow
+
+
+class AstronomyTower(Location):
+    def __init__(self, _):
+        super().__init__("Astronomy Tower", 3, 8, "ALL heroes discard an item")
+
+    def _reveal_effect(self, game):
+        game.heroes.all_heroes.effect(game, self.__per_hero)
+
+    def __per_hero(self, game, hero):
+        items = sum(1 for card in hero._hand if card.is_item())
+        if items == 0:
+            game.log(f"{hero.name} has no items to discard, safe!")
+            return
+        while True:
+            choice = int(game.input(f"Choose an item for {hero.name} to discard: ", range(len(hero._hand))))
+            card = hero._hand[choice]
+            if not card.is_item():
+                game.log(f"{card.name} is not an item!")
+                continue
+            hero.discard(game, choice)
+            break
+
+LOCATIONS_BY_NAME["Astronomy Tower"] = AstronomyTower
+
+
+class GodricsHollow(Location):
+    def __init__(self, _):
+        super().__init__("Godric's Hollow", 1, 6)
+
+LOCATIONS_BY_NAME["Godric's Hollow"] = GodricsHollow
+
+
+class Gringotts(Location):
+    def __init__(self, _):
+        super().__init__("Gringotts", 2, 6)
+
+LOCATIONS_BY_NAME["Gringotts"] = Gringotts
+
+
+class RoomOfRequirement(Location):
+    def __init__(self, _):
+        super().__init__("Room of Requirement", 2, 7)
+
+LOCATIONS_BY_NAME["Room of Requirement"] = RoomOfRequirement
+
+
+class HogwartsCastle(Location):
+    def __init__(self, _):
+        super().__init__("Hogwarts Castle", 3, 8, f"ALL heroes lose 2{constants.HEART}, may spend 5{constants.DAMAGE} to remove 1{constants.CONTROL}", ('H', "(H)ogwarts Castle", self._action))
+
+    def _reveal_effect(self, game):
+        game.heroes.all_heroes.remove_hearts(game, 2)
+
+    def _action(self, game):
+        if game.heroes.active_hero._damage_tokens < 5:
+            game.log(f"Not enough {constants.DAMAGE} to use Hogwarts Castle")
+            return
+        game.heroes.active_hero.remove_damage(game, 5)
+        game.locations.remove_control(game)
+
+LOCATIONS_BY_NAME["Hogwarts Castle"] = HogwartsCastle
+
+
+class CastleGates(Location):
+    def __init__(self, _):
+        super().__init__("Castle Gates", 1, 5)
+
+LOCATIONS_BY_NAME["Castle Gates"] = CastleGates
+
+
+class HagridsHut(Location):
+    def __init__(self, _):
+        super().__init__("Hagrid's Hut", 2, 6)
+
+LOCATIONS_BY_NAME["Hagrid's Hut"] = HagridsHut
+
+
+class GreatHall(Location):
+    def __init__(self, _):
+        super().__init__("Great Hall", 3, 7)
+
+LOCATIONS_BY_NAME["Great Hall"] = GreatHall
+
+
+class DADAClassroom(Location):
+    def __init__(self, _):
+        super().__init__("D.A.D.A. Classroom", 1, 6)
+
+LOCATIONS_BY_NAME["D.A.D.A. Classroom"] = DADAClassroom
+
+
+class CastleHallways(Location):
+    def __init__(self, _):
+        super().__init__("Castle Hallways", 2, 6)
+
+LOCATIONS_BY_NAME["Castle Hallways"] = CastleHallways
+
+
+class WhompingWillow(Location):
+    def __init__(self, _):
+        super().__init__("Whomping Willow", 3, 7)
+
+LOCATIONS_BY_NAME["Whomping Willow"] = WhompingWillow
+
+
+class UnicornHollow(Location):
+    def __init__(self, _):
+        super().__init__("Unicorn Hollow", 1, 5)
+
+LOCATIONS_BY_NAME["Unicorn Hollow"] = UnicornHollow
+
+
+class AragogsLair(Location):
+    def __init__(self, _):
+        super().__init__("Aragog's Lair", 2, 6)
+
+LOCATIONS_BY_NAME["Aragog's Lair"] = AragogsLair
+
+
+class GiantClearing(Location):
+    def __init__(self, _):
+        super().__init__("Giant Clearing", 3, 7)
+
+LOCATIONS_BY_NAME["Giant Clearing"] = GiantClearing
+
+
+class SelectionOfChampions(Location):
+    def __init__(self, _):
+        super().__init__("Selection of Champions", 1, 5)
+
+LOCATIONS_BY_NAME["Selection of Champions"] = SelectionOfChampions
+
+
+class DragonArena(Location):
+    def __init__(self, _):
+        super().__init__("Dragon Arena", 2, 6)
+
+LOCATIONS_BY_NAME["Dragon Arena"] = DragonArena
+
+
+class MermaidVillage(Location):
+    def __init__(self, _):
+        super().__init__("Mermaid Village", 2, 6)
+
+LOCATIONS_BY_NAME["Mermaid Village"] = MermaidVillage
+
+
+class TriwizardMaze(Location):
+    def __init__(self, _):
+        super().__init__("Triwizard Maze", 3, 7, f"Remove 1{constants.DAMAGE} and 1{constants.INFLUENCE} from ALL Creatures")
+
+    def _reveal_effect(game):
+        game.villain_deck.all_creatures.remove_damage(game, 1)
+        game.villain_deck.all_creatures.remove_influence(game, 1)
+
+LOCATIONS_BY_NAME["Triwizard Maze"] = TriwizardMaze
+
+
+class TheBlackLake(Location):
+    def __init__(self, _):
+        super().__init__("The Black Lake", 1, 5)
+
+LOCATIONS_BY_NAME["The Black Lake"] = TheBlackLake
+
+
+class TheHospitalWing(Location):
+    def __init__(self, num_heroes):
+        super().__init__("The Hospital Wing", 2, 6 if num_heroes < 4 else 7)
+
+LOCATIONS_BY_NAME["The Hospital Wing"] = TheHospitalWing
+
+
+class TheHogwartsLibrary(Location):
+    def __init__(self, _):
+        super().__init__("The Hogwarts Library", 3, 7)
+
+LOCATIONS_BY_NAME["The Hogwarts Library"] = TheHogwartsLibrary
+
 
 potions_one_locations = [
-    Location("The Black Lake", 1, 5),
-    Location("The Hospital Wing", 2, 6), # TODO: 7 for 4-5 heroes
-    Location("The Hogwarts Library", 3, 7),
+    TheBlackLake,
+    TheHospitalWing,
+    TheHogwartsLibrary,
 ]
+
+
+class MinistryOfMagicAtrium(Location):
+    def __init__(self, num_heroes):
+        super().__init__("Ministry of Magic Atrium", 1, 5 if num_heroes < 4 else 6)
+
+LOCATIONS_BY_NAME["Ministry of Magic Atrium"] = MinistryOfMagicAtrium
+
+
+class MinistryCourtroom(Location):
+    def __init__(self, num_heroes):
+        super().__init__("Ministry Courtroom", 2, 6 if num_heroes < 4 else 7)
+
+LOCATIONS_BY_NAME["Ministry Courtroom"] = MinistryCourtroom
+
+
+class MinistryLift(Location):
+    def __init__(self, _):
+        super().__init__("Ministry Lift", 3, 7)
+
+LOCATIONS_BY_NAME["Ministry Lift"] = MinistryLift
+
 
 potions_two_locations = [
-    Location("Ministry of Magic Atrium", 1, 5), # TODO: 6 for 4-5 heroes
-    Location("Ministry Courtroom", 2, 6), # TODO: 7 for 4-5 heroes
-    Location("Ministry Lift", 3, 7),
+    MinistryOfMagicAtrium,
+    MinistryCourtroom,
+    MinistryLift,
 ]
+
+
+class MalfoyManor(Location):
+    def __init__(self, _):
+        super().__init__("Malfoy Manor", 1, 5)
+
+LOCATIONS_BY_NAME["Malfoy Manor"] = MalfoyManor
+
+
+class Cave(Location):
+    def __init__(self, num_heroes):
+        super().__init__("Cave", 2, 5 if num_heroes < 4 else 6)
+
+LOCATIONS_BY_NAME["Cave"] = Cave
+
+
+class AtopTheTower(Location):
+    def __init__(self, num_heroes):
+        super().__init__("Atop the Tower", 3, 6 if num_heroes < 4 else 7)
+
+LOCATIONS_BY_NAME["Atop the Tower"] = AtopTheTower
+
 
 potions_three_locations = [
-    Location("Malfoy Manor", 1, 5),
-    Location("Cave", 2, 5), # TODO: 6 for 4-5 heroes
-    Location("Atop the Tower", 3, 6), # TODO: 7 for 4-5 heroes
+    MalfoyManor,
+    Cave,
+    AtopTheTower,
 ]
 
+
+class GreatHall(Location):
+    def __init__(self, num_heroes):
+        super().__init__("Great Hall", 1, 6 if num_heroes < 4 else 7)
+
+LOCATIONS_BY_NAME["Great Hall"] = GreatHall
+
+
+class ForestClearing(Location):
+    def __init__(self, num_heroes):
+        super().__init__("Forest Clearing", 2, 6 if num_heroes < 4 else 7)
+
+LOCATIONS_BY_NAME["Forest Clearing"] = ForestClearing
+
+
+class CastleCourtyard(Location):
+    def __init__(self, num_heroes):
+        super().__init__("Castle Courtyard", 3, 7 if num_heroes < 4 else 8)
+
+LOCATIONS_BY_NAME["Castle Courtyard"] = CastleCourtyard
+
+
 potions_four_locations = [
-    Location("Great Hall", 1, 6), # TODO: 7 for 4-5 heroes
-    Location("Forest Clearing", 2, 6), # TODO: 7 for 4-5 heroes
-    Location("Castle Courtyard", 3, 7), # TODO: 8 for 4-5 heroes
+    GreatHall,
+    ForestClearing,
+    CastleCourtyard,
 ]
+
 
 POTIONS_LOCATIONS = [
     -1,

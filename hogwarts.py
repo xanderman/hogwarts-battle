@@ -9,15 +9,11 @@ import random
 import constants
 
 class HogwartsDeck(object):
-    def __init__(self, window, game_num):
+    def __init__(self, window, chosen_cards):
         self._window = window
         self._init_window()
         self._pad = curses.newpad(100, 100)
-        if isinstance(game_num, int):
-            self._deck = reduce(operator.add, CARDS[:game_num])
-        elif game_num[0] == 'm':
-            self._deck = reduce(operator.add, CARDS)
-            self._deck.extend(reduce(operator.add, MONSTER_BOX_CARDS[:int(game_num[1])]))
+        self._deck = [CARDS_BY_NAME[card_name]() for card_name in chosen_cards]
         self._max = 6
         random.shuffle(self._deck)
         self._market = defaultdict(list)
@@ -76,6 +72,9 @@ class HogwartsDeck(object):
         if len(self._market[name]) == 0:
             del self._market[name]
         return card
+
+
+CARDS_BY_NAME = {}
 
 
 class HogwartsCard(object):
@@ -164,6 +163,8 @@ class WingardiumLeviosa(Spell):
         game.heroes.active_hero.add_influence(game)
         game.heroes.active_hero.can_put_items_in_deck(game)
 
+CARDS_BY_NAME['Wingardium Leviosa'] = WingardiumLeviosa
+
 
 class Reparo(Spell):
     def __init__(self):
@@ -180,6 +181,8 @@ class Reparo(Spell):
         elif choice == "d":
             game.heroes.active_hero.draw(game)
 
+CARDS_BY_NAME['Reparo'] = Reparo
+
 
 class Lumos(Spell):
     def __init__(self):
@@ -187,6 +190,8 @@ class Lumos(Spell):
 
     def _effect(self, game):
         game.heroes.all_heroes.draw(game)
+
+CARDS_BY_NAME['Lumos'] = Lumos
 
 
 class Incendio(Spell):
@@ -196,6 +201,8 @@ class Incendio(Spell):
     def _effect(self, game):
         game.heroes.active_hero.add(game, damage=1, cards=1)
 
+CARDS_BY_NAME['Incendio'] = Incendio
+
 
 class Descendo(Spell):
     def __init__(self):
@@ -203,6 +210,8 @@ class Descendo(Spell):
 
     def _effect(self, game):
         game.heroes.active_hero.add_damage(game, 2)
+
+CARDS_BY_NAME['Descendo'] = Descendo
 
 
 class EssenceOfDittany(Item):
@@ -222,6 +231,8 @@ class EssenceOfDittany(Item):
             hero.add_hearts(game, 2)
             break
 
+CARDS_BY_NAME['Essence of Dittany'] = EssenceOfDittany
+
 
 class QuidditchGear(Item):
     def __init__(self):
@@ -229,6 +240,8 @@ class QuidditchGear(Item):
 
     def _effect(self, game):
         game.heroes.active_hero.add(game, damage=1, hearts=1)
+
+CARDS_BY_NAME['Quidditch Gear'] = QuidditchGear
 
 
 class SortingHat(Item):
@@ -239,6 +252,8 @@ class SortingHat(Item):
         game.heroes.active_hero.add_influence(game, 2)
         game.heroes.active_hero.can_put_allies_in_deck(game)
 
+CARDS_BY_NAME['Sorting Hat'] = SortingHat
+
 
 class GoldenSnitch(Item):
     def __init__(self):
@@ -246,6 +261,8 @@ class GoldenSnitch(Item):
 
     def _effect(self, game):
         game.heroes.active_hero.add(game, influence=2, cards=1)
+
+CARDS_BY_NAME['Golden Snitch'] = GoldenSnitch
 
 
 class OliverWood(Ally):
@@ -262,6 +279,8 @@ class OliverWood(Ally):
             return
         game.heroes.choose_hero(game, prompt=f"Oliver Wood: Villain defeated! Choose hero to gain 2{constants.HEART}: ").add_hearts(game, 2)
 
+CARDS_BY_NAME['Oliver Wood'] = OliverWood
+
 
 class RubeusHagrid(Ally):
     def __init__(self):
@@ -271,6 +290,8 @@ class RubeusHagrid(Ally):
         game.heroes.active_hero.add_damage(game)
         game.heroes.all_heroes.add_hearts(game)
 
+CARDS_BY_NAME['Rubeus Hagrid'] = RubeusHagrid
+
 
 class AlbusDumbledore(Ally):
     def __init__(self):
@@ -279,39 +300,7 @@ class AlbusDumbledore(Ally):
     def _effect(self, game):
         game.heroes.all_heroes.add(game, damage=1, influence=1, hearts=1, cards=1)
 
-
-game_one_cards = [
-    WingardiumLeviosa(),
-    WingardiumLeviosa(),
-    WingardiumLeviosa(),
-    Reparo(),
-    Reparo(),
-    Reparo(),
-    Reparo(),
-    Reparo(),
-    Reparo(),
-    Lumos(),
-    Lumos(),
-    Incendio(),
-    Incendio(),
-    Incendio(),
-    Incendio(),
-    Descendo(),
-    Descendo(),
-    EssenceOfDittany(),
-    EssenceOfDittany(),
-    EssenceOfDittany(),
-    EssenceOfDittany(),
-    QuidditchGear(),
-    QuidditchGear(),
-    QuidditchGear(),
-    QuidditchGear(),
-    SortingHat(),
-    GoldenSnitch(),
-    OliverWood(),
-    RubeusHagrid(),
-    AlbusDumbledore(),
-]
+CARDS_BY_NAME['Albus Dumbledore'] = AlbusDumbledore
 
 
 class Finite(Spell):
@@ -321,6 +310,8 @@ class Finite(Spell):
     def _effect(self, game):
         game.locations.remove_control(game)
 
+CARDS_BY_NAME['Finite'] = Finite
+
 
 class Expelliarmus(Spell):
     def __init__(self):
@@ -328,6 +319,8 @@ class Expelliarmus(Spell):
 
     def _effect(self, game):
         game.heroes.active_hero.add(game, damage=2, cards=1)
+
+CARDS_BY_NAME['Expelliarmus'] = Expelliarmus
 
 
 class PolyjuicePotion(Item):
@@ -353,6 +346,8 @@ class PolyjuicePotion(Item):
             card._effect(game)
             break
 
+CARDS_BY_NAME['Polyjuice Potion'] = PolyjuicePotion
+
 
 class Nimbus2001(Item):
     def __init__(self):
@@ -364,6 +359,8 @@ class Nimbus2001(Item):
 
     def __villain_reward(self, game):
         game.heroes.active_hero.add_influence(game, 2)
+
+CARDS_BY_NAME['Nimbus 2001'] = Nimbus2001
 
 
 class Fawkes(Ally):
@@ -381,6 +378,8 @@ class Fawkes(Ally):
         elif choice == "h":
             game.heroes.all_heroes.add_hearts(game, 2)
 
+CARDS_BY_NAME['Fawkes'] = Fawkes
+
 
 class MollyWeasley(Ally):
     def __init__(self):
@@ -388,6 +387,8 @@ class MollyWeasley(Ally):
 
     def _effect(self, game):
         game.heroes.all_heroes.add(game, influence=1, hearts=2)
+
+CARDS_BY_NAME['Molly Weasley'] = MollyWeasley
 
 
 class Dobby(Ally):
@@ -398,6 +399,8 @@ class Dobby(Ally):
         game.locations.remove_control(game)
         game.heroes.active_hero.draw(game)
 
+CARDS_BY_NAME['Dobby'] = Dobby
+
 
 class ArthurWeasley(Ally):
     def __init__(self):
@@ -405,6 +408,8 @@ class ArthurWeasley(Ally):
 
     def _effect(self, game):
         game.heroes.all_heroes.add_influence(game, 2)
+
+CARDS_BY_NAME['Arthur Weasley'] = ArthurWeasley
 
 
 class GilderyLockhart(Ally):
@@ -422,6 +427,8 @@ class GilderyLockhart(Ally):
     def discard_effect(self, game, hero):
         hero.draw(game)
 
+CARDS_BY_NAME['Gilderoy Lockhart'] = GilderyLockhart
+
 
 class GinnyWeasley(Ally):
     def __init__(self):
@@ -430,23 +437,7 @@ class GinnyWeasley(Ally):
     def _effect(self, game):
         game.heroes.active_hero.add(game, damage=1, influence=1)
 
-
-game_two_cards = [
-    Finite(),
-    Finite(),
-    Expelliarmus(),
-    Expelliarmus(),
-    PolyjuicePotion(),
-    PolyjuicePotion(),
-    Nimbus2001(),
-    Nimbus2001(),
-    Fawkes(),
-    MollyWeasley(),
-    Dobby(),
-    ArthurWeasley(),
-    GilderyLockhart(),
-    GinnyWeasley(),
-]
+CARDS_BY_NAME['Ginny Weasley'] = GinnyWeasley
 
 
 class ExpectoPatronum(Spell):
@@ -456,6 +447,8 @@ class ExpectoPatronum(Spell):
     def _effect(self, game):
         game.heroes.active_hero.add_damage(game)
         game.locations.remove_control(game)
+
+CARDS_BY_NAME['Expecto Patronum'] = ExpectoPatronum
 
 
 class PetrificusTotalus(Spell):
@@ -473,6 +466,8 @@ class PetrificusTotalus(Spell):
             return
         game.villain_deck[choice].stun(game)
 
+CARDS_BY_NAME['Petrificus Totalus'] = PetrificusTotalus
+
 
 class ChocolateFrog(Item):
     def __init__(self):
@@ -484,6 +479,8 @@ class ChocolateFrog(Item):
     def discard_effect(self, game, hero):
         hero.add(game, influence=1, hearts=1)
 
+CARDS_BY_NAME['Chocolate Frog'] = ChocolateFrog
+
 
 class Butterbeer(Item):
     def __init__(self):
@@ -491,6 +488,8 @@ class Butterbeer(Item):
 
     def _effect(self, game):
         game.heroes.choose_two_heroes(game, prompt=f"to gain 1{constants.INFLUENCE} and 1{constants.HEART}: ").add(game, influence=1, hearts=1)
+
+CARDS_BY_NAME['Butterbeer'] = Butterbeer
 
 
 class CrystalBall(Item):
@@ -505,6 +504,8 @@ class CrystalBall(Item):
             return
         hero.choose_and_discard(game, with_callbacks=False)
 
+CARDS_BY_NAME['Crystal Ball'] = CrystalBall
+
 
 class MaraudersMap(Item):
     def __init__(self):
@@ -515,6 +516,8 @@ class MaraudersMap(Item):
 
     def discard_effect(self, game, hero):
         game.heroes.all_heroes.draw(game)
+
+CARDS_BY_NAME["Marauder's Map"] = MaraudersMap
 
 
 class RemusLupin(Ally):
@@ -528,6 +531,8 @@ class RemusLupin(Ally):
             return
         game.heroes.choose_hero(game, prompt=f"Choose hero to gain 3{constants.HEART}: ").add_hearts(game, 3)
 
+CARDS_BY_NAME['Remus Lupin'] = RemusLupin
+
 
 class SiriusBlack(Ally):
     def __init__(self):
@@ -535,6 +540,8 @@ class SiriusBlack(Ally):
 
     def _effect(self, game):
         game.heroes.active_hero.add(game, damage=2, influence=1)
+
+CARDS_BY_NAME['Sirius Black'] = SiriusBlack
 
 
 class SybillTrelawney(Ally):
@@ -555,25 +562,7 @@ class SybillTrelawney(Ally):
             game.log(f"Discarded spell, gaining 2{constants.INFLUENCE}")
             hero.add_influence(game, 2)
 
-
-game_three_cards = [
-    ExpectoPatronum(),
-    ExpectoPatronum(),
-    PetrificusTotalus(),
-    PetrificusTotalus(),
-    ChocolateFrog(),
-    ChocolateFrog(),
-    ChocolateFrog(),
-    Butterbeer(),
-    Butterbeer(),
-    Butterbeer(),
-    CrystalBall(),
-    CrystalBall(),
-    MaraudersMap(),
-    RemusLupin(),
-    SiriusBlack(),
-    SybillTrelawney(),
-]
+CARDS_BY_NAME['Sybill Trelawney'] = SybillTrelawney
 
 
 class Accio(Spell):
@@ -597,6 +586,8 @@ class Accio(Spell):
         hero._discard.remove(item)
         hero._hand.append(item)
 
+CARDS_BY_NAME['Accio'] = Accio
+
 
 class Protego(Spell):
     def __init__(self):
@@ -607,6 +598,8 @@ class Protego(Spell):
 
     def discard_effect(self, game, hero):
         hero.add(game, damage=1, hearts=1)
+
+CARDS_BY_NAME['Protego'] = Protego
 
 
 class HogwartsAHistory(Item):
@@ -624,6 +617,8 @@ class HogwartsAHistory(Item):
         elif choice == "s":
             game.roll_slytherin_die()
 
+CARDS_BY_NAME['Hogwarts: A History'] = HogwartsAHistory
+
 
 class Pensieve(Item):
     def __init__(self):
@@ -631,6 +626,8 @@ class Pensieve(Item):
 
     def _effect(self, game):
         game.heroes.choose_two_heroes(game, prompt=f"to gain 1{constants.INFLUENCE} and draw a card: ").add(game, influence=1, cards=1)
+
+CARDS_BY_NAME['Pensieve'] = Pensieve
 
 
 class TriwizardCup(Item):
@@ -640,6 +637,8 @@ class TriwizardCup(Item):
     def _effect(self, game):
         game.heroes.active_hero.add(game, damage=1, influence=1, hearts=1)
 
+CARDS_BY_NAME['Triwizard Cup'] = TriwizardCup
+
 
 class SeverusSnape(Ally):
     def __init__(self):
@@ -648,6 +647,8 @@ class SeverusSnape(Ally):
     def _effect(self, game):
         game.heroes.active_hero.add(game, damage=1, hearts=2)
         game.roll_slytherin_die()
+
+CARDS_BY_NAME['Severus Snape'] = SeverusSnape
 
 
 class FleurDelacour(Ally):
@@ -671,6 +672,8 @@ class FleurDelacour(Ally):
             game.heroes.active_hero.add_hearts(game, 2)
             self._used_ability = True
 
+CARDS_BY_NAME['Fleur Delacour'] = FleurDelacour
+
 
 class FiliusFlitwick(Ally):
     def __init__(self):
@@ -680,6 +683,8 @@ class FiliusFlitwick(Ally):
         game.heroes.active_hero.add(game, influence=1, cards=1)
         game.roll_ravenclaw_die()
 
+CARDS_BY_NAME['Filius Flitwick'] = FiliusFlitwick
+
 
 class CedricDiggory(Ally):
     def __init__(self):
@@ -688,6 +693,8 @@ class CedricDiggory(Ally):
     def _effect(self, game):
         game.heroes.active_hero.add_damage(game)
         game.roll_hufflepuff_die()
+
+CARDS_BY_NAME['Cedric Diggory'] = CedricDiggory
 
 
 class ViktorKrum(Ally):
@@ -701,6 +708,8 @@ class ViktorKrum(Ally):
     def __villain_reward(self, game):
         game.heroes.active_hero.add(game, influence=1, hearts=1)
 
+CARDS_BY_NAME['Viktor Krum'] = ViktorKrum
+
 
 class MadEyeMoody(Ally):
     def __init__(self):
@@ -710,6 +719,8 @@ class MadEyeMoody(Ally):
         game.heroes.active_hero.add_influence(game, 2)
         game.locations.remove_control(game)
 
+CARDS_BY_NAME['Mad-eye Moody'] = MadEyeMoody
+
 
 class MinervaMcGonagall(Ally):
     def __init__(self):
@@ -718,6 +729,8 @@ class MinervaMcGonagall(Ally):
     def _effect(self, game):
         game.heroes.active_hero.add(game, influence=1, damage=1)
         game.roll_gryffindor_die()
+
+CARDS_BY_NAME['Minerva McGonagall'] = MinervaMcGonagall
 
 
 class PomonaSprout(Ally):
@@ -732,30 +745,7 @@ class PomonaSprout(Ally):
             game.heroes.choose_hero(game, prompt=f"Choose hero to gain 2{constants.HEART}: ").add_hearts(game, 2)
         game.roll_hufflepuff_die()
 
-
-game_four_cards = [
-    Accio(),
-    Accio(),
-    Protego(),
-    Protego(),
-    Protego(),
-    HogwartsAHistory(),
-    HogwartsAHistory(),
-    HogwartsAHistory(),
-    HogwartsAHistory(),
-    HogwartsAHistory(),
-    HogwartsAHistory(),
-    Pensieve(),
-    TriwizardCup(),
-    SeverusSnape(),
-    FleurDelacour(),
-    FiliusFlitwick(),
-    CedricDiggory(),
-    ViktorKrum(),
-    MadEyeMoody(),
-    MinervaMcGonagall(),
-    PomonaSprout(),
-]
+CARDS_BY_NAME['Pomona Sprout'] = PomonaSprout
 
 
 class Stupefy(Spell):
@@ -765,6 +755,8 @@ class Stupefy(Spell):
     def _effect(self, game):
         game.heroes.active_hero.add(game, damage=1, cards=1)
         game.locations.remove_control(game)
+
+CARDS_BY_NAME['Stupefy'] = Stupefy
 
 
 class Owls(Item):
@@ -791,8 +783,10 @@ class Owls(Item):
             game.heroes.active_hero.add(game, damage=1, hearts=1)
             self._used_ability = True
 
+CARDS_BY_NAME['O.W.L.S.'] = Owls
 
-class NympadoraTonks(Ally):
+
+class NymphadoraTonks(Ally):
     def __init__(self):
         super().__init__("Nymphadora Tonks", f"Gain 3{constants.INFLUENCE} or 2{constants.DAMAGE}, or remove 1{constants.CONTROL}", 5)
 
@@ -810,6 +804,8 @@ class NympadoraTonks(Ally):
             game.heroes.active_hero.add_damage(game, 2)
         elif choice == "c":
             game.locations.remove_control(game)
+
+CARDS_BY_NAME['Nymphadora Tonks'] = NymphadoraTonks
 
 
 class WeasleyTwin(Ally):
@@ -835,6 +831,8 @@ class FredWeasley(WeasleyTwin):
         game.log(f"{hero.name} has {card.name}, ALL heroes gain 1{constants.INFLUENCE}")
         game.heroes.all_heroes.add_influence(game, 1)
 
+CARDS_BY_NAME['Fred Weasley'] = FredWeasley
+
 
 class GeorgeWeasley(WeasleyTwin):
     def __init__(self):
@@ -843,6 +841,8 @@ class GeorgeWeasley(WeasleyTwin):
     def _weasley_bonus(self, game, hero, card):
         game.log(f"{hero.name} has {card.name}, ALL heroes gain 1{constants.HEART}")
         game.heroes.all_heroes.add_hearts(game, 1)
+
+CARDS_BY_NAME['George Weasley'] = GeorgeWeasley
 
 
 class ChoChang(Ally):
@@ -857,6 +857,8 @@ class ChoChang(Ally):
         elif game.input("Drawing not allowed, still discard? (y/n): ", "yn") == 'n':
             return
         hero.choose_and_discard(game, 2, with_callbacks=False)
+
+CARDS_BY_NAME['Cho Chang'] = ChoChang
 
 
 class LunaAlly(Ally):
@@ -881,6 +883,8 @@ class LunaAlly(Ally):
             game.heroes.active_hero.add_damage(game, 1)
             self._used_ability = True
 
+CARDS_BY_NAME['Luna Lovegood'] = LunaAlly
+
 
 class KingsleyShacklebolt(Ally):
     def __init__(self):
@@ -890,19 +894,8 @@ class KingsleyShacklebolt(Ally):
         game.heroes.active_hero.add(game, damage=2, hearts=1)
         game.locations.remove_control(game)
 
+CARDS_BY_NAME['Kingsley Shacklebolt'] = KingsleyShacklebolt
 
-game_five_cards = [
-    Stupefy(),
-    Stupefy(),
-    Owls(),
-    Owls(),
-    NympadoraTonks(),
-    FredWeasley(),
-    GeorgeWeasley(),
-    ChoChang(),
-    LunaAlly(),
-    KingsleyShacklebolt(),
-]
 
 class Confundus(Spell):
     def __init__(self):
@@ -923,6 +916,8 @@ class Confundus(Spell):
             game.locations.remove_control(game)
             self._used_ability = True
 
+CARDS_BY_NAME['Confundus'] = Confundus
+
 
 class Bezoar(Item):
     def __init__(self):
@@ -935,6 +930,8 @@ class Bezoar(Item):
             game.heroes.choose_hero(game, prompt=f"Choose hero to gain 3{constants.HEART}: ").add_hearts(game, 3)
         game.heroes.active_hero.draw(game)
 
+CARDS_BY_NAME['Bezoar'] = Bezoar
+
 
 class Deluminator(Item):
     def __init__(self):
@@ -942,6 +939,8 @@ class Deluminator(Item):
 
     def _effect(self, game):
         game.locations.remove_control(game, 2)
+
+CARDS_BY_NAME['Deluminator'] = Deluminator
 
 
 class AdvancedPotionMaking(Item):
@@ -954,6 +953,8 @@ class AdvancedPotionMaking(Item):
             if hero._hearts == hero._max_hearts:
                 game.log(f"{hero.name} at max hearts, gaining 1{constants.DAMAGE} and drawing a card")
                 hero.add(game, damage=1, cards=1)
+
+CARDS_BY_NAME['Advanced Potion-Making'] = AdvancedPotionMaking
 
 
 class FelixFelicis(Item):
@@ -989,6 +990,8 @@ class FelixFelicis(Item):
             elif choice == 'c':
                 game.heroes.active_hero.draw(game, 2)
 
+CARDS_BY_NAME['Felix Felicis'] = FelixFelicis
+
 
 class ElderWand(Item):
     def __init__(self):
@@ -1005,6 +1008,8 @@ class ElderWand(Item):
         if card.is_spell():
             game.log(f"Spell {card.name} played, elder wand adds 1{constants.DAMAGE} and 1{constants.HEART}")
             game.heroes.active_hero.add(game, damage=1, hearts=1)
+
+CARDS_BY_NAME['Elder Wand'] = ElderWand
 
 
 class HoraceSlughorn(Ally):
@@ -1028,19 +1033,7 @@ class HoraceSlughorn(Ally):
                 hero.add_hearts(game, 1)
         game.roll_slytherin_die()
 
-
-game_six_cards = [
-    Confundus(),
-    Confundus(),
-    Bezoar(),
-    Bezoar(),
-    Deluminator(),
-    AdvancedPotionMaking(),
-    FelixFelicis(),
-    FelixFelicis(),
-    ElderWand(),
-    HoraceSlughorn(),
-]
+CARDS_BY_NAME['Horace Slughorn'] = HoraceSlughorn
 
 
 class SwordOfGryffindor(Item):
@@ -1052,21 +1045,7 @@ class SwordOfGryffindor(Item):
         game.roll_gryffindor_die()
         game.roll_gryffindor_die()
 
-
-game_seven_cards = [
-    SwordOfGryffindor(),
-]
-
-
-CARDS = [
-    game_one_cards,
-    game_two_cards,
-    game_three_cards,
-    game_four_cards,
-    game_five_cards,
-    game_six_cards,
-    game_seven_cards,
-]
+CARDS_BY_NAME['Sword of Gryffindor'] = SwordOfGryffindor
 
 
 class Detention(Item):
@@ -1097,6 +1076,8 @@ class Tergeo(Spell):
         if banished is not None and banished.is_item():
             hero.draw(game)
 
+CARDS_BY_NAME['Tergeo'] = Tergeo
+
 
 class FiniteIncantatem(Spell):
     def __init__(self):
@@ -1107,6 +1088,8 @@ class FiniteIncantatem(Spell):
 
     def _effect(self, game):
         game.locations.remove_control(game)
+
+CARDS_BY_NAME['Finite Incantatem'] = FiniteIncantatem
 
 
 class OldSock(Item):
@@ -1130,6 +1113,8 @@ class OldSock(Item):
     def discard_effect(self, game, hero):
         hero.add_influence(game, 2)
 
+CARDS_BY_NAME['Old Sock'] = OldSock
+
 
 class Harp(Item):
     def __init__(self):
@@ -1149,6 +1134,8 @@ class Harp(Item):
             return
         game.villain_deck[choice].stun(game)
 
+CARDS_BY_NAME['Harp'] = Harp
+
 
 class Fang(Ally):
     def __init__(self):
@@ -1160,6 +1147,8 @@ class Fang(Ally):
     def _effect(self, game):
         hero = game.heroes.choose_hero(game, prompt=f"Choose hero to gain 1{constants.INFLUENCE} and 2{constants.HEART}: ")
         hero.add(game, influence=1, hearts=2)
+
+CARDS_BY_NAME['Fang'] = Fang
 
 
 class Filch(Ally):
@@ -1181,22 +1170,7 @@ class Filch(Ally):
         elif choice == 'b':
             game.heroes.active_hero.choose_and_banish(game, hand_only=True, optional=False)
 
-
-monster_box_one_cards = [
-    Tergeo(),
-    Tergeo(),
-    Tergeo(),
-    Tergeo(),
-    Tergeo(),
-    Tergeo(),
-    FiniteIncantatem(),
-    FiniteIncantatem(),
-    OldSock(),
-    OldSock(),
-    Harp(),
-    Fang(),
-    Filch(),
-]
+CARDS_BY_NAME['Argus Filch & Mrs Norris'] = Filch
 
 
 class Buckbeak(Ally):
@@ -1217,6 +1191,8 @@ class Buckbeak(Ally):
             game.log(f"Discarded ally, gaining 2{constants.DAMAGE}")
             hero.add_damage(game, 2)
 
+CARDS_BY_NAME['Buckbeak'] = Buckbeak
+
 
 class MonsterBook(Item):
     def __init__(self):
@@ -1228,6 +1204,8 @@ class MonsterBook(Item):
     def _effect(self, game):
         game.heroes.active_hero.add_damage(game, 1)
         game.roll_creature_die()
+
+CARDS_BY_NAME['Monster Book of Monsters'] = MonsterBook
 
 
 class Immobulus(Spell):
@@ -1245,6 +1223,8 @@ class Immobulus(Spell):
         game.log(f"Defeated creature, {self.name} removes 1{constants.CONTROL}")
         game.locations.remove_control(game)
 
+CARDS_BY_NAME['Immobulus'] = Immobulus
+
 
 class Depulso(Spell):
     def __init__(self):
@@ -1258,18 +1238,7 @@ class Depulso(Spell):
         if banished is None:
             game.heroes.active_hero.add_influence(game, 2)
 
-
-monster_box_two_cards = [
-    Buckbeak(),
-    MonsterBook(),
-    MonsterBook(),
-    MonsterBook(),
-    Immobulus(),
-    Immobulus(),
-    Immobulus(),
-    Depulso(),
-    Depulso(),
-]
+CARDS_BY_NAME['Depulso'] = Depulso
 
 
 class Kreacher(Ally):
@@ -1284,6 +1253,8 @@ class Kreacher(Ally):
         hero = game.heroes.choose_hero(game, prompt=f"Choose hero to banish a card (c to cancel): ", optional=True)
         if hero is not None:
           hero.choose_and_banish(game)
+
+CARDS_BY_NAME['Kreacher'] = Kreacher
 
 
 class Thestral(Ally):
@@ -1309,6 +1280,8 @@ class Thestral(Ally):
             elif choice == 'h':
                 hero.add_hearts(game, 2)
 
+CARDS_BY_NAME['Thestral'] = Thestral
+
 
 class Griphook(Ally):
     def __init__(self):
@@ -1329,6 +1302,8 @@ class Griphook(Ally):
                 game.log(f"Discarded item {card.name}, gaining 2{constants.INFLUENCE}")
                 hero.add_influence(game, 2)
 
+CARDS_BY_NAME['Griphook'] = Griphook
+
 
 class ErumpentHorn(Item):
     def __init__(self):
@@ -1340,6 +1315,8 @@ class ErumpentHorn(Item):
     def _effect(self, game):
         game.heroes.active_hero.remove_hearts(game, 2)
         game.heroes.active_hero.add_damage(game, 3)
+
+CARDS_BY_NAME['Erumpent Horn'] = ErumpentHorn
 
 
 class LacewingFlies(Item):
@@ -1358,6 +1335,8 @@ class LacewingFlies(Item):
     def discard_effect(self, game, hero):
         hero.add_damage(game)
 
+CARDS_BY_NAME['Lacewing Flies'] = LacewingFlies
+
 
 class Nox(Spell):
     def __init__(self):
@@ -1370,17 +1349,7 @@ class Nox(Spell):
         game.heroes.active_hero.add_damage(game, 1)
         game.heroes.all_heroes.choose_and_banish(game)
 
-
-monster_box_three_cards = [
-    Kreacher(),
-    Thestral(),
-    Griphook(),
-    ErumpentHorn(),
-    LacewingFlies(),
-    LacewingFlies(),
-    Nox(),
-    Nox(),
-]
+CARDS_BY_NAME['Nox'] = Nox
 
 
 class MadameMaxime(Ally):
@@ -1393,6 +1362,8 @@ class MadameMaxime(Ally):
     def _effect(self, game):
         game.heroes.active_hero.add_damage(game, 2)
         game.heroes.all_heroes.add_hearts(game, 2)
+
+CARDS_BY_NAME['Madame Maxime'] = MadameMaxime
 
 
 class IgorKarkaroff(Ally):
@@ -1409,6 +1380,8 @@ class IgorKarkaroff(Ally):
     def __villain_reward(self, game):
         game.heroes.active_hero.add(game, damage=1, influence=1)
 
+CARDS_BY_NAME['Igor Karkaroff'] = IgorKarkaroff
+
 
 class GoldenEgg(Item):
     def __init__(self):
@@ -1419,6 +1392,8 @@ class GoldenEgg(Item):
 
     def _effect(self, game):
         game.heroes.active_hero.add(game, damage=2, influence=1, cards=1)
+
+CARDS_BY_NAME['Golden Egg'] = GoldenEgg
 
 
 class Gillyweed(Item):
@@ -1448,6 +1423,8 @@ class Gillyweed(Item):
         game.log(f"Ally {card.name} played, gillyweed grants {constants.HEART}")
         game.heroes.choose_hero(game, prompt=f"Choose hero to gain 1{constants.HEART}: ").add_hearts(game)
 
+CARDS_BY_NAME['Gillyweed'] = Gillyweed
+
 
 class DragonsBlood(Item):
     def __init__(self):
@@ -1460,6 +1437,8 @@ class DragonsBlood(Item):
         game.heroes.all_heroes.add_hearts(game, 3)
         for creature in game.villain_deck.all_creatures:
             creature._max_influence_per_turn += 1
+
+CARDS_BY_NAME["Dragon's Blood"] = DragonsBlood
 
 
 class PrioriIncantatem(Spell):
@@ -1488,22 +1467,4 @@ class PrioriIncantatem(Spell):
             card._effect(game)
             break
 
-
-monster_box_four_cards = [
-    MadameMaxime(),
-    IgorKarkaroff(),
-    GoldenEgg(),
-    Gillyweed(),
-    Gillyweed(),
-    DragonsBlood(),
-    PrioriIncantatem(),
-    PrioriIncantatem(),
-]
-
-
-MONSTER_BOX_CARDS = [
-    monster_box_one_cards,
-    monster_box_two_cards,
-    monster_box_three_cards,
-    monster_box_four_cards,
-]
+CARDS_BY_NAME['Priori Incantatem'] = PrioriIncantatem

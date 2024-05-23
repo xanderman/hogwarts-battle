@@ -31,7 +31,7 @@ ALPHA_OPTIONS = ['a', 'b', 'd', 'e', 'f', 'g', 'j', 'k', 'l', 'm',
 
 
 class Heroes(object):
-    def __init__(self, window, game_num, chosen_heroes):
+    def __init__(self, window, chosen_heroes):
         self._window = window
         self._heroes = chosen_heroes
         self._hero_rows = 2 if len(self._heroes) > 2 else 1
@@ -209,12 +209,9 @@ class HeroList(list):
 
 
 class Hero(object):
-    def __init__(self, name, game_num, starting_deck, proficiency):
+    def __init__(self, name, ability, starting_deck, proficiency):
         self.name = name
-        self._game_num = game_num
-        if not isinstance(game_num, int):
-            # TODO: this works, but is a hack. Need option for alternate abilities
-            self._game_num = 8
+        self._ability = ability
         self._max_hearts = 10
         self._hearts = 10
         self._deck = []
@@ -1048,8 +1045,8 @@ class LionHat(hogwarts.Item):
 
 
 class Hermione(Hero):
-    def __init__(self, game_num, proficiency):
-        super().__init__("Hermione", game_num, [
+    def __init__(self, ability, proficiency):
+        super().__init__("Hermione", ability, [
             Alohomora(),
             Alohomora(),
             Alohomora(),
@@ -1066,9 +1063,9 @@ class Hermione(Hero):
 
     @property
     def ability_description(self):
-        if self._game_num < 3:
+        if self._ability < 3:
             return None
-        if self._game_num < 7:
+        if self._ability < 7:
             return f"If you play 4 or more spells, one hero gains 1{constants.INFLUENCE}"
         return f"If you play 4 or more spells, ALL heroes gain 1{constants.INFLUENCE}"
 
@@ -1084,10 +1081,10 @@ class Hermione(Hero):
         if self._spells_played != 4 or self._used_ability:
             return
         self._used_ability = True
-        if self._game_num >= 7:
+        if self._ability >= 7:
             self._game_seven_ability(game)
             return
-        if self._game_num >= 3:
+        if self._ability >= 3:
             self._game_three_ability(game)
 
     def _game_three_ability(self, game):
@@ -1103,8 +1100,8 @@ class Hermione(Hero):
 
 
 class Ron(Hero):
-    def __init__(self, game_num, proficiency):
-        super().__init__("Ron", game_num, [
+    def __init__(self, ability, proficiency):
+        super().__init__("Ron", ability, [
             Alohomora(),
             Alohomora(),
             Alohomora(),
@@ -1121,9 +1118,9 @@ class Ron(Hero):
 
     @property
     def ability_description(self):
-        if self._game_num < 3:
+        if self._ability < 3:
             return None
-        if self._game_num < 7:
+        if self._ability < 7:
             return f"If you assign 3 or more {constants.DAMAGE}, one hero gains 2{constants.HEART}"
         return f"If you assign 3 or more {constants.DAMAGE}, ALL heroes gain 2{constants.HEART}"
 
@@ -1135,10 +1132,10 @@ class Ron(Hero):
         if self._damage_assigned != 3 or self._used_ability:
             return
         self._used_ability = True
-        if self._game_num >= 7:
+        if self._ability >= 7:
             self._game_seven_ability(game)
             return
-        if self._game_num >= 3:
+        if self._ability >= 3:
             self._game_three_ability(game)
 
     def play_turn(self, game):
@@ -1147,6 +1144,9 @@ class Ron(Hero):
         super().play_turn(game)
 
     def _game_three_ability(self, game):
+        if not game.heroes.healing_allowed:
+            game.log(f"Nobody can heal, ignoring {self.name}'s ability")
+            return
         game.heroes.choose_hero(game, prompt=f"{self.name} assigned 3 or more {constants.DAMAGE}, choose hero to gain 2{constants.HEART}: ").add_hearts(game, 2)
 
     def _game_seven_ability(self, game):
@@ -1159,8 +1159,8 @@ class Ron(Hero):
 
 
 class Harry(Hero):
-    def __init__(self, game_num, proficiency):
-        super().__init__("Harry", game_num, [
+    def __init__(self, ability, proficiency):
+        super().__init__("Harry", ability, [
             Alohomora(),
             Alohomora(),
             Alohomora(),
@@ -1176,9 +1176,9 @@ class Harry(Hero):
 
     @property
     def ability_description(self):
-        if self._game_num < 3:
+        if self._ability < 3:
             return None
-        if self._game_num < 7:
+        if self._ability < 7:
             return f"The first time {constants.CONTROL} is removed on any turn, one hero gains 1{constants.DAMAGE}"
         return f"The first time {constants.CONTROL} is removed on any turn, two heroes gain 1{constants.DAMAGE}"
 
@@ -1188,10 +1188,10 @@ class Harry(Hero):
         if self._used_ability:
             return
         self._used_ability = True
-        if self._game_num >= 7:
+        if self._ability >= 7:
             self._game_seven_ability_control_callback(game, amount)
             return
-        if self._game_num >= 3:
+        if self._ability >= 3:
             self._game_three_ability_control_callback(game, amount)
 
     def _game_three_ability_control_callback(self, game, amount):
@@ -1208,8 +1208,8 @@ class Harry(Hero):
 
 
 class Neville(Hero):
-    def __init__(self, game_num, proficiency):
-        super().__init__("Neville", game_num, [
+    def __init__(self, ability, proficiency):
+        super().__init__("Neville", ability, [
             Alohomora(),
             Alohomora(),
             Alohomora(),
@@ -1225,19 +1225,19 @@ class Neville(Hero):
 
     @property
     def ability_description(self):
-        if self._game_num < 3:
+        if self._ability < 3:
             return None
-        if self._game_num < 7:
+        if self._ability < 7:
             return f"The first time a hero gains {constants.HEART} on your turn, that hero gains +1{constants.HEART}"
         return f"Each time a hero gains {constants.HEART} on your turn, that hero gains +1{constants.HEART}"
 
     def hearts_callback(self, game, hero, amount, source):
         if source == self:
             return
-        if self._game_num >= 7:
+        if self._ability >= 7:
             self._game_seven_ability_healing_callback(game, hero, amount)
             return
-        if self._game_num >= 3:
+        if self._ability >= 3:
             self._game_three_ability_healing_callback(game, hero, amount)
 
     def _game_three_ability_healing_callback(self, game, hero, amount):
@@ -1284,8 +1284,8 @@ class Neville(Hero):
 
 
 class Ginny(Hero):
-    def __init__(self, game_num, proficiency):
-        super().__init__("Ginny", game_num, [
+    def __init__(self, ability, proficiency):
+        super().__init__("Ginny", ability, [
             Alohomora(),
             Alohomora(),
             Alohomora(),
@@ -1302,7 +1302,7 @@ class Ginny(Hero):
 
     @property
     def ability_description(self):
-        if self._game_num < 3:
+        if self._ability < 3:
             return None
         return f"If you assign {constants.DAMAGE} to 2 or more villains, ALL heroes gain 1{constants.INFLUENCE}"
 
@@ -1311,7 +1311,7 @@ class Ginny(Hero):
         if villain is None:
             return
         self._villains_damaged.add(villain)
-        if self._game_num < 3 or len(self._villains_damaged) != 2 or self._used_ability:
+        if self._ability < 3 or len(self._villains_damaged) != 2 or self._used_ability:
             return
         self._used_ability = True
         game.log(f"{self.name} assigned {constants.DAMAGE}/{constants.INFLUENCE} to 2 or more villains, ALL heroes gain 1{constants.INFLUENCE}")
@@ -1324,8 +1324,8 @@ class Ginny(Hero):
 
 
 class Luna(Hero):
-    def __init__(self, game_num, proficiency):
-        super().__init__("Luna", game_num, [
+    def __init__(self, ability, proficiency):
+        super().__init__("Luna", ability, [
             Alohomora(),
             Alohomora(),
             Alohomora(),
@@ -1341,14 +1341,14 @@ class Luna(Hero):
 
     @property
     def ability_description(self):
-        if self._game_num < 3:
+        if self._ability < 3:
             return None
         return f"If you draw at least one extra card, one hero gains 2{constants.HEART}"
 
     def draw(self, game, count=1, end_of_turn=False):
         cards_before = len(self._hand)
         super().draw(game, count, end_of_turn)
-        if not end_of_turn and self._game_num >= 3 and len(self._hand) > cards_before and not self._used_ability:
+        if not end_of_turn and self._ability >= 3 and len(self._hand) > cards_before and not self._used_ability:
             game.heroes.choose_hero(game, prompt=f"{self.name} drew first extra card, choose hero to gain 2{constants.HEART}: ").add_hearts(game, 2)
             self._used_ability = True
 
