@@ -342,11 +342,11 @@ class HagridsHut(Location):
 LOCATIONS_BY_NAME["Hagrid's Hut"] = HagridsHut
 
 
-class GreatHall(Location):
+class GreatHallM1(Location):
     def __init__(self, _):
         super().__init__("Great Hall", 3, 7)
 
-LOCATIONS_BY_NAME["Great Hall"] = GreatHall
+LOCATIONS_BY_NAME["Great Hall (m1)"] = GreatHallM1
 
 
 class DADAClassroom(Location):
@@ -444,13 +444,6 @@ class TheHogwartsLibrary(Location):
 LOCATIONS_BY_NAME["The Hogwarts Library"] = TheHogwartsLibrary
 
 
-potions_one_locations = [
-    TheBlackLake,
-    TheHospitalWing,
-    TheHogwartsLibrary,
-]
-
-
 class MinistryOfMagicAtrium(Location):
     def __init__(self, num_heroes):
         super().__init__("Ministry of Magic Atrium", 1, 5 if num_heroes < 4 else 6)
@@ -470,13 +463,6 @@ class MinistryLift(Location):
         super().__init__("Ministry Lift", 3, 7)
 
 LOCATIONS_BY_NAME["Ministry Lift"] = MinistryLift
-
-
-potions_two_locations = [
-    MinistryOfMagicAtrium,
-    MinistryCourtroom,
-    MinistryLift,
-]
 
 
 class MalfoyManor(Location):
@@ -500,18 +486,11 @@ class AtopTheTower(Location):
 LOCATIONS_BY_NAME["Atop the Tower"] = AtopTheTower
 
 
-potions_three_locations = [
-    MalfoyManor,
-    Cave,
-    AtopTheTower,
-]
-
-
-class GreatHall(Location):
+class GreatHallP4(Location):
     def __init__(self, num_heroes):
         super().__init__("Great Hall", 1, 6 if num_heroes < 4 else 7)
 
-LOCATIONS_BY_NAME["Great Hall"] = GreatHall
+LOCATIONS_BY_NAME["Great Hall (p4)"] = GreatHallP4
 
 
 class ForestClearing(Location):
@@ -526,19 +505,3 @@ class CastleCourtyard(Location):
         super().__init__("Castle Courtyard", 3, 7 if num_heroes < 4 else 8)
 
 LOCATIONS_BY_NAME["Castle Courtyard"] = CastleCourtyard
-
-
-potions_four_locations = [
-    GreatHall,
-    ForestClearing,
-    CastleCourtyard,
-]
-
-
-POTIONS_LOCATIONS = [
-    -1,
-    potions_one_locations,
-    potions_two_locations,
-    potions_three_locations,
-    potions_four_locations,
-]
