@@ -12,4 +12,4 @@ for f in Path(__file__).parent.glob("*.py"):
     if f.stem == "base":
         continue
     import_module(f".{f.stem}", __package__)
-del import_module, Path
+del f, import_module, Path
