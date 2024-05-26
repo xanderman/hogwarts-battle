@@ -1,3 +1,5 @@
+import random
+
 from . import VILLAINS_BY_NAME, Creature
 import constants
 

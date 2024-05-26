@@ -1,3 +1,5 @@
+import random
+
 from . import VOLDEMORTS_BY_NAME, Villain
 import constants
 
