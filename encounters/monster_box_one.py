@@ -71,15 +71,14 @@ class StudentsOutOfBed(Encounter):
         if self.completed:
             return False
         return ((constants.CARD in result and not self._got_card) or
-                (result == constants.HEART and not self._got_heart) or
-                (result == (constants.HEART + constants.HEART) and not self._got_heart))
+                (constants.HEART in result and not self._got_heart))
 
     def apply_die_roll(self, game, result):
         if not self.die_roll_applies(game, result):
             raise ValueError(f"Programmer Error! Students Out of Bed only applies to {constants.HEART} or {constants.CARD}")
         if constants.CARD in result:
             self._got_card = True
-        else:
+        if constants.HEART in result:
             self._got_heart = True
         if self._got_heart and self._got_card:
             self.completed = True

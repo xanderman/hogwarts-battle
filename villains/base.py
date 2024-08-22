@@ -186,6 +186,7 @@ VOLDEMORTS_BY_NAME = {}
 class _Foe(object):
     def __init__(self, name, description, reward_desc, hearts=0, cost=0):
         self.name = name
+        self.unique_name = name
         self.description = description
         self.reward_desc = reward_desc
         self._hearts = hearts

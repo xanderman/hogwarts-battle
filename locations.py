@@ -79,8 +79,9 @@ class Locations(object):
 
 
 class Location(object):
-    def __init__(self, name, dark_arts_count, control_max, desc="", action=None):
+    def __init__(self, name, dark_arts_count, control_max, desc="", action=None, unique_name=None):
         self.name = name
+        self.unique_name = unique_name if unique_name is not None else name
         self.dark_arts_count = dark_arts_count
         self._control_max = control_max
         self.desc = desc
@@ -344,7 +345,7 @@ LOCATIONS_BY_NAME["Hagrid's Hut"] = HagridsHut
 
 class GreatHallM1(Location):
     def __init__(self, _):
-        super().__init__("Great Hall", 3, 7)
+        super().__init__("Great Hall", 3, 7, unique_name="Great Hall (m1)")
 
 LOCATIONS_BY_NAME["Great Hall (m1)"] = GreatHallM1
 
@@ -416,7 +417,7 @@ class TriwizardMaze(Location):
     def __init__(self, _):
         super().__init__("Triwizard Maze", 3, 7, f"Remove 1{constants.DAMAGE} and 1{constants.INFLUENCE} from ALL Creatures")
 
-    def _reveal_effect(game):
+    def _reveal_effect(self, game):
         game.villain_deck.all_creatures.remove_damage(game, 1)
         game.villain_deck.all_creatures.remove_influence(game, 1)
 
@@ -488,7 +489,7 @@ LOCATIONS_BY_NAME["Atop the Tower"] = AtopTheTower
 
 class GreatHallP4(Location):
     def __init__(self, num_heroes):
-        super().__init__("Great Hall", 1, 6 if num_heroes < 4 else 7)
+        super().__init__("Great Hall", 1, 6 if num_heroes < 4 else 7, unique_name="Great Hall (p4)")
 
 LOCATIONS_BY_NAME["Great Hall (p4)"] = GreatHallP4
 

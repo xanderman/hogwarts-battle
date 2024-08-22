@@ -13,7 +13,12 @@ class Horcrux(Encounter):
 
 class Diary(Horcrux):
     def __init__(self):
-        super().__init__("Diary", f"Each time a hero plays an ally, lose 1{constants.HEART}", f"If you play 2 allies, one hero gains 2{constants.HEART}")
+        super().__init__(
+            "Diary",
+            f"Each time a hero plays an ally, lose 1{constants.HEART}",
+            f"If you play 2 allies, one hero gains 2{constants.HEART}")
+        self._allies_played = 0
+        self._used_ability = False
 
     def _display_to_complete(self, window):
         window.addstr(f"roll {constants.HEART} or {constants.CARD}")
@@ -23,9 +28,7 @@ class Diary(Horcrux):
     def die_roll_applies(self, game, result):
         if self.completed:
             return False
-        return (result == constants.HEART
-            or result == (constants.HEART + constants.HEART)
-            or constants.CARD in result)
+        return constants.HEART in result or constants.CARD in result
 
     def apply_die_roll(self, game, result):
         if not self.die_roll_applies(game, result):
@@ -64,7 +67,12 @@ ENCOUNTERS_BY_NAME['Diary'] = Diary
 
 class Ring(Horcrux):
     def __init__(self):
-        super().__init__("Ring", f"If you assign 2{constants.DAMAGE} to a villain, lose 2{constants.HEART}", f"1/turn: discard two cards to remove 1{constants.CONTROL}")
+        super().__init__(
+            "Ring",
+            f"If you assign 2{constants.DAMAGE} to a villain, lose 2{constants.HEART}",
+            f"1/turn: discard two cards to remove 1{constants.CONTROL}")
+        self._damaged_villains = Counter()
+        self._used_villains = set()
 
     def _display_to_complete(self, window):
         window.addstr(f"roll {constants.DAMAGE} or {constants.INFLUENCE}")
@@ -72,24 +80,26 @@ class Ring(Horcrux):
             window.addstr(" ✔", curses.A_BOLD | curses.color_pair(1))
 
     def die_roll_applies(self, game, result):
-        return (result == constants.DAMAGE or result == constants.INFLUENCE) and not self.completed
+        if self.completed:
+            return False
+        return constants.DAMAGE in result or constants.INFLUENCE in result
 
     def apply_die_roll(self, game, result):
-        if not (result == constants.DAMAGE or result == constants.INFLUENCE):
+        if not self.die_roll_applies(game, result):
             raise ValueError(f"Programmer Error! Ring only applies to {constants.DAMAGE} or {constants.INFLUENCE}")
         self.completed = True
 
     def effect(self, game):
         self._damaged_villains = Counter()
-        self._used_ability = set()
+        self._used_villains = set()
         game.heroes.active_hero.add_extra_damage_effect(game, self.__extra_effect)
 
     def __extra_effect(self, game, villain, damage):
         if self.completed or not villain.is_villain:
             return
-        self._damaged_villains[villain] += damage
-        if self._damaged_villains[villain] >= 2 and villain not in self._used_ability:
-            self._used_ability.add(villain)
+        self._damaged_villains[villain.unique_name] += damage
+        if self._damaged_villains[villain.unique_name] >= 2 and villain.unique_name not in self._used_villains:
+            self._used_villains.add(villain.unique_name)
             game.log(f"{self.name}: {game.heroes.active_hero.name} assigned 2{constants.DAMAGE} to {villain.name}, loses 2{constants.HEART}")
             game.heroes.active_hero.remove_hearts(game, 2)
 
@@ -135,9 +145,13 @@ ENCOUNTERS_BY_NAME['Ring'] = Ring
 
 class Locket(Horcrux):
     def __init__(self):
-        super().__init__("Locket", f"Heroes cannot gain {constants.DAMAGE} or {constants.INFLUENCE} on other heroes' turns", "1/turn: discard a card to roll the Slytherin die")
+        super().__init__(
+            "Locket",
+            f"Heroes cannot gain {constants.DAMAGE} or {constants.INFLUENCE} on other heroes' turns",
+            "1/turn: discard a card to roll the Slytherin die")
         self._got_damage = False
         self._got_heart = False
+        self._used_ability = False
 
     def _display_to_complete(self, window):
         window.addstr(f"roll {constants.DAMAGE}")
@@ -150,16 +164,15 @@ class Locket(Horcrux):
     def die_roll_applies(self, game, result):
         if self.completed:
             return False
-        return ((result == constants.DAMAGE and not self._got_damage) or
-                (result == constants.HEART and not self._got_heart) or
-                (result == (constants.HEART + constants.HEART) and not self._got_heart))
+        return ((constants.DAMAGE in result and not self._got_damage) or
+                (constants.HEART in result and not self._got_heart))
 
     def apply_die_roll(self, game, result):
         if not self.die_roll_applies(game, result):
             raise ValueError(f"Programmer Error! Locket only applies to {constants.DAMAGE} or {constants.HEART}")
-        if result == constants.DAMAGE:
+        if constants.DAMAGE in result:
             self._got_damage = True
-        else:
+        if constants.HEART in result:
             self._got_heart = True
         if self._got_damage and self._got_heart:
             game.heroes.all_heroes.allow_gaining_tokens_out_of_turn(game)
@@ -199,9 +212,13 @@ ENCOUNTERS_BY_NAME['Locket'] = Locket
 
 class Cup(Horcrux):
     def __init__(self):
-        super().__init__("Cup", f"Remove 1{constants.DAMAGE} from all villains", "1/turn: discard a card to roll the Hufflepuff die")
+        super().__init__(
+            "Cup",
+            f"Remove 1{constants.DAMAGE} from all villains",
+            "1/turn: discard a card to roll the Hufflepuff die")
         self._got_heart = False
         self._got_influence = False
+        self._used_ability = False
 
     def _display_to_complete(self, window):
         window.addstr(f"roll {constants.HEART}")
@@ -214,16 +231,15 @@ class Cup(Horcrux):
     def die_roll_applies(self, game, result):
         if self.completed:
             return False
-        return ((result == constants.HEART and not self._got_heart) or
-                (result == (constants.HEART + constants.HEART) and not self._got_heart) or
-                (result == constants.INFLUENCE and not self._got_influence))
+        return ((constants.HEART in result and not self._got_heart) or
+                (constants.INFLUENCE in result and not self._got_influence))
 
     def apply_die_roll(self, game, result):
         if not self.die_roll_applies(game, result):
             raise ValueError(f"Programmer Error! Cup only applies to {constants.HEART} or {constants.INFLUENCE}")
-        if result == constants.INFLUENCE:
+        if constants.INFLUENCE in result:
             self._got_influence = True
-        else:
+        if constants.HEART in result:
             self._got_heart = True
         if self._got_heart and self._got_influence:
             self.completed = True
@@ -259,9 +275,13 @@ ENCOUNTERS_BY_NAME['Cup'] = Cup
 
 class Diadem(Horcrux):
     def __init__(self):
-        super().__init__("Diadem", f"If the active hero has one ally, item, and spell, lose 2{constants.HEART}", "1/turn: discard a card to roll the Ravenclaw die")
+        super().__init__(
+            "Diadem",
+            f"If the active hero has one ally, item, and spell, lose 2{constants.HEART}",
+            "1/turn: discard a card to roll the Ravenclaw die")
         self._got_card = False
         self._got_damage = False
+        self._used_ability = False
 
     def _display_to_complete(self, window):
         window.addstr(f"roll {constants.CARD}")
@@ -272,16 +292,18 @@ class Diadem(Horcrux):
             window.addstr("✔", curses.A_BOLD | curses.color_pair(1))
 
     def die_roll_applies(self, game, result):
+        if self.completed:
+            return False
         return ((constants.CARD in result and not self._got_card) or
-                (result == constants.DAMAGE and not self._got_damage)) and not self.completed
+                (constants.DAMAGE in result and not self._got_damage))
 
     def apply_die_roll(self, game, result):
+        if not self.die_roll_applies(game, result):
+            raise ValueError(f"Programmer Error! Diadem only applies to {constants.CARD} or {constants.DAMAGE}")
         if constants.CARD in result:
             self._got_card = True
-        elif result == constants.DAMAGE:
+        if constants.DAMAGE in result:
             self._got_damage = True
-        else:
-            raise ValueError(f"Programmer Error! Diadem only applies to {constants.CARD} or {constants.DAMAGE}")
         if self._got_card and self._got_damage:
             self.completed = True
 
@@ -322,7 +344,10 @@ ENCOUNTERS_BY_NAME['Diadem'] = Diadem
 
 class Nagini(Horcrux):
     def __init__(self):
-        super().__init__("Nagini", f"Active hero loses 1{constants.HEART} and cannot gain {constants.HEART}", f"1/game: discard this to remove 3{constants.CONTROL}")
+        super().__init__(
+            "Nagini",
+            f"Active hero loses 1{constants.HEART} and cannot gain {constants.HEART}",
+            f"1/game: discard this to remove 3{constants.CONTROL}")
         self._got_damage = False
         self._got_card = False
         self._got_heart = False
@@ -341,19 +366,18 @@ class Nagini(Horcrux):
     def die_roll_applies(self, game, result):
         if self.completed:
             return False
-        return ((result == constants.DAMAGE and not self._got_damage) or
+        return ((constants.DAMAGE in result and not self._got_damage) or
                 (constants.CARD in result and not self._got_card) or
-                (result == constants.HEART and not self._got_heart) or
-                (result == (constants.HEART + constants.HEART) and not self._got_heart))
+                (constants.HEART in result and not self._got_heart))
 
     def apply_die_roll(self, game, result):
         if not self.die_roll_applies(game, result):
             raise ValueError(f"Programmer Error! Nagini only applies to {constants.DAMAGE} or {constants.CARD} or {constants.HEART}")
-        if result == constants.DAMAGE:
+        if constants.DAMAGE in result:
             self._got_damage = True
-        elif constants.CARD in result:
+        if constants.CARD in result:
             self._got_card = True
-        else:
+        if constants.HEART in result:
             self._got_heart = True
         if self._got_damage and self._got_card and self._got_heart:
             self.completed = True

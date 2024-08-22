@@ -42,9 +42,9 @@ class TheFirstTask(Encounter):
     def __extra_effect(self, game, villain, damage):
         if self.completed:
             return
-        self._damaged_foes[villain] += damage
-        if self._damaged_foes[villain] >= 2 and villain not in self._used_ability:
-            self._used_ability.add(villain)
+        self._damaged_foes[villain.unique_name] += damage
+        if self._damaged_foes[villain.unique_name] >= 2 and villain.unique_name not in self._used_ability:
+            self._used_ability.add(villain.unique_name)
             game.log(f"{self.name}: {game.heroes.active_hero.name} assigned 2{constants.DAMAGE} to {villain.name}, loses 2{constants.HEART}")
             game.heroes.active_hero.remove_hearts(game, 2)
 
@@ -143,15 +143,12 @@ class TheThirdTask(Encounter):
     def die_roll_applies(self, game, result):
         if self.completed:
             return False
-        return result == constants.HEART or result == (constants.HEART + constants.HEART)
+        return constants.HEART in result
 
     def apply_die_roll(self, game, result):
-        if result == constants.HEART:
-            self._got_heart += 1
-        elif result == (constants.HEART + constants.HEART):
-            self._got_heart += 2
-        else:
+        if not self.die_roll_applies(game, result):
             raise ValueError(f"Programmer Error! The Third Task only applies to {constants.HEART}")
+        self._got_heart += result.count(constants.HEART)
         if self._got_heart >= 3:
             self.completed = True
 

@@ -30,18 +30,17 @@ class ForbiddenForest(Encounter):
         if self.completed:
             return False
         return ((constants.CARD in result and not self._got_card) or
-                (result == constants.INFLUENCE and not self._got_influence) or
-                (result == constants.HEART and not self._got_heart) or
-                (result == (constants.HEART + constants.HEART) and not self._got_heart))
+                (constants.INFLUENCE in result and not self._got_influence) or
+                (constants.HEART in result and not self._got_heart))
 
     def apply_die_roll(self, game, result):
         if not self.die_roll_applies(game, result):
             raise ValueError(f"Programmer Error! Nagini only applies to {constants.CARD} or {constants.HEART} or {constants.INFLUENCE}")
         if constants.CARD in result:
             self._got_card = True
-        elif result == constants.INFLUENCE:
+        if constants.INFLUENCE in result:
             self._got_influence = True
-        else:
+        if constants.HEART in result:
             self._got_heart = True
         if self._got_card and self._got_heart and self._got_influence:
             self.completed = True

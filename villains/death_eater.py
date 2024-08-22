@@ -17,6 +17,12 @@ class DeathEater(Villain):
         game.heroes.all_heroes.add_hearts(game, 1)
         game.locations.remove_control(game)
 
+
+class DeathEater2(DeathEater):
+    def __init__(self):
+        super().__init__()
+        self.unique_name = "Death Eater 2"
+
+
 VILLAINS_BY_NAME["Death Eater"] = DeathEater
-# This makes 2 Death Eaters available for games with random villains
-VILLAINS_BY_NAME["Death Eater 2"] = DeathEater
+VILLAINS_BY_NAME["Death Eater 2"] = DeathEater2

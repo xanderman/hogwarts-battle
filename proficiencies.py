@@ -178,10 +178,10 @@ class Herbology(Proficiency):
     def hearts_callback(self, game, hero, amount, source):
         if amount < 1:
             return
-        self._healing[hero] += amount
-        if self._healing[hero] >= 3 and hero not in self._used_ability:
-            game.log(f"{self.name}: {hero.name} gained {self._healing[hero]}{constants.HEART} this turn, drawing a card")
-            self._used_ability.add(hero)
+        self._healing[hero.name] += amount
+        if self._healing[hero.name] >= 3 and hero.name not in self._used_ability:
+            game.log(f"{self.name}: {hero.name} gained {self._healing[hero.name]}{constants.HEART} this turn, drawing a card")
+            self._used_ability.add(hero.name)
             hero.draw(game, 1)
 
 
@@ -215,16 +215,31 @@ class Arithmancy(Proficiency):
 class Potions(Proficiency):
     def __init__(self):
         super().__init__("Potions", f"If you play at least one ally, item, and spell, one hero gains 1{constants.DAMAGE} and 1{constants.HEART}")
-        self._types_played = set()
-        self._wanted_types = set([hogwarts.Ally, hogwarts.Item, hogwarts.Spell])
+        self._played_ally = False
+        self._played_item = False
+        self._played_spell = False
+
+    def dump_state(self):
+        return super().dump_state() | {
+            "played_ally": self._played_ally,
+            "played_item": self._played_item,
+            "played_spell": self._played_spell,
+        }
 
     def start_turn(self, game):
-        self._types_played = set()
+        self._played_ally = False
+        self._played_item = False
+        self._played_spell = False
         game.heroes.active_hero.add_extra_card_effect(game, self._extra_card_effect)
 
     def _extra_card_effect(self, game, card):
-        self._types_played.add(type(card))
-        if self._types_played.issuperset(self._wanted_types) and not self._used_ability:
+        if card.is_ally():
+            self._played_ally = True
+        if card.is_item():
+            self._played_item = True
+        if card.is_spell():
+            self._played_spell = True
+        if self._played_ally and self._played_item and self._played_spell and not self._used_ability:
             self._used_ability = True
             game.heroes.choose_hero(game, prompt=f"{self.name}: played at least one ally, item, and spell. Choose hero to gain 1{constants.DAMAGE} and 1{constants.HEART}: ").add(game, damage=1, hearts=1)
 
@@ -264,6 +279,7 @@ class Divination(Proficiency):
 class CareOfMagicalCreatures(Proficiency):
     def __init__(self):
         super().__init__("Care of Magical Creatures", f"The first time you assign {constants.DAMAGE}/{constants.INFLUENCE} to a Creature, one hero gains 2{constants.HEART}; if you defeat a Creature, remove 1{constants.CONTROL}")
+        self._damaged_creatures = set()
 
     def start_turn(self, game):
         game.heroes.active_hero.add_extra_damage_effect(game, self._extra_damage_effect)
@@ -271,9 +287,9 @@ class CareOfMagicalCreatures(Proficiency):
         self._damaged_creatures = set()
 
     def _extra_damage_effect(self, game, creature, amount):
-        if creature in self._damaged_creatures:
+        if creature.unique_name in self._damaged_creatures:
             return
-        self._damaged_creatures.add(creature)
+        self._damaged_creatures.add(creature.unique_name)
         game.heroes.choose_hero(game, prompt=f"{self.name}: {game.heroes.active_hero.name} assigned {amount}{constants.DAMAGE} to {creature.name}. Choose hero to gain 2{constants.HEART}: ").add(game, hearts=2)
 
     def _extra_creature_reward(self, game, creature):
