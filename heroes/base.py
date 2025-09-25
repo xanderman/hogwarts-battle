@@ -664,7 +664,7 @@ class Hero(object):
             game.log(f"No villains to assign {constants.DAMAGE} to!")
             return None
         if sum(1 for v in game.villain_deck.all if v.can_take_damage(game)) == 0:
-            game.log(f"No villains to assign {constants.INFLUENCE} to!")
+            game.log(f"No villains to assign {constants.DAMAGE} to!")
             return None
         choices = ['c'] + game.villain_deck.choices
         choice = game.input(f"Choose villain to assign {constants.DAMAGE} to ('c' to cancel): ", choices)

@@ -7,7 +7,7 @@ class Basilisk(VillainCreature):
         super().__init__(
                 "Basilisk",
                 "Heroes cannot draw extra cards",
-                f"ALL heroes gain 1{constants.INFLUENCE}, remove 1{constants.CONTROL}",
+                f"ALL heroes draw 1{constants.CARD}, remove 1{constants.CONTROL}",
                 hearts=8)
 
     def _on_reveal(self, game):

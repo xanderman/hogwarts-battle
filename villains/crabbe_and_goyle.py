@@ -7,7 +7,7 @@ class CrabbeAndGoyle(Villain):
         super().__init__(
                 "Crabbe & Goyle",
                 f"When forced to discard, lose 1{constants.HEART}",
-                "ALL heroes draw 1 card",
+                f"ALL heroes draw 1{constants.CARD}",
                 hearts=5)
 
     def _on_reveal(self, game):

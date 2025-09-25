@@ -6,7 +6,7 @@ class Centaur(Creature):
     def __init__(self):
         super().__init__(
                 "Centaur",
-                f"Active heroe discards a spell or loses 2{constants.HEART}",
+                f"Active hero discards a spell or loses 2{constants.HEART}",
                 f"ALL heroes may take a Spell from discard; remove 1{constants.CONTROL}",
                 cost=7)
 
