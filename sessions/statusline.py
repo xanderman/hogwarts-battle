@@ -115,6 +115,7 @@ data = json.load(sys.stdin)
 cwd = data.get("cwd", ".")
 model_name = data.get("model", {}).get("display_name", "unknown")
 session_id = data.get("session_id", "unknown")
+total_cost = data.get("cost", {}).get("total_cost_usd", 0.0)
 
 task_dir = PROJECT_ROOT / "sessions" / "tasks"
 #!<
@@ -261,7 +262,6 @@ if transcript_path:
             context_length = (most_recent_usage.get('input_tokens', 0) + most_recent_usage.get('cache_read_input_tokens', 0) + most_recent_usage.get('cache_creation_input_tokens', 0))
     except Exception as e:
         pass
-#!<
 
 #!> Use context_length and context_limit to calculate context percentage
 if context_length and context_length < 17000: context_length = 17000
@@ -442,6 +442,7 @@ uncommitted_str = " ".join(uncommitted_parts)
 
 line2_parts = [
     f"{purple}{mode_icon} {curr_mode}{reset}",
+    f"{l_gray}${total_cost:.4f}{reset}",
     uncommitted_str,
     f"{cyan}{tasks_icon} {open_task_count + open_task_dir_count} open{reset}"
 ]
