@@ -11,6 +11,7 @@ description: Tasks related to test infrastructure, test utilities, and testing t
 ### High Priority
 
 ### Medium Priority
+- `m-test-add-hogwarts-card-tests.md` - Add comprehensive unit tests for 5 additional Hogwarts cards (Lumos, Stupefy, Sorting Hat, Rubeus Hagrid, Chocolate Frog)
 
 ### Low Priority
 
