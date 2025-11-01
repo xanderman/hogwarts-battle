@@ -416,7 +416,7 @@ if task_dir.exists() and task_dir.is_dir():
 ##-##
 
 ## ===== FINAL OUTPUT ===== ##
-# Line 1 - Progress bar | Task
+# Line 1 - Progress bar | Cost | Task
 context_part = progress_bar_str if progress_bar_str else f"{gray}No context usage data{reset}"
 if icon_style == IconStyle.NERD_FONTS:
     task_icon = "󰒓 "
@@ -425,7 +425,12 @@ elif icon_style == IconStyle.EMOJI:
 else:  # ASCII
     task_icon = "Task: "
 task_part = f"{cyan}{task_icon}{curr_task}{reset}" if curr_task else f"{cyan}{task_icon}{gray}No Task{reset}"
-print(f"{context_part} | {task_part}")
+line1_parts = [
+    context_part,
+    f"{l_gray}${total_cost:.4f}{reset}",
+    task_part
+]
+print(" | ".join(line1_parts))
 
 # Line 2 - Mode | Edited & Uncommitted with upstream | Open Tasks | Git branch
 if icon_style == IconStyle.NERD_FONTS:
@@ -442,7 +447,6 @@ uncommitted_str = " ".join(uncommitted_parts)
 
 line2_parts = [
     f"{purple}{mode_icon} {curr_mode}{reset}",
-    f"{l_gray}${total_cost:.4f}{reset}",
     uncommitted_str,
     f"{cyan}{tasks_icon} {open_task_count + open_task_dir_count} open{reset}"
 ]

@@ -52,3 +52,16 @@
 
    Your choice:
    ```
+
+5. Clean up feature branch
+
+   After successfully merging and pushing:
+   ```bash
+   # Delete local feature branch
+   git branch -d <feature-branch>
+
+   # Delete remote feature branch (if it was pushed)
+   git push origin --delete <feature-branch>
+   ```
+
+   Note: If the remote branch doesn't exist (never pushed), the delete command will fail harmlessly.
