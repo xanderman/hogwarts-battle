@@ -17,7 +17,7 @@ pretty limited.
 To play, run `game.py` specifying which game number and heroes you want to play.
 
 ```bash
-$ python game.py N HERO [HERO ...]
+$ python3 game.py N HERO [HERO ...]
 ```
 
 Currently supported values of N are 1-7 (the entire base game). Currently
