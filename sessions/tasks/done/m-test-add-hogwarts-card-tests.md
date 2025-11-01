@@ -1,7 +1,7 @@
 ---
 name: m-test-add-hogwarts-card-tests
 branch: feature/m-test-add-hogwarts-card-tests
-status: pending
+status: completed
 created: 2025-11-01
 ---
 
@@ -11,10 +11,10 @@ created: 2025-11-01
 Add comprehensive unit tests for 5 additional Hogwarts Battle cards to increase test coverage and ensure card mechanics work correctly. Tests should follow the established pattern using FakeGame framework and cover various scenarios including card registration, effect behavior, edge cases, and logging.
 
 ## Success Criteria
-- [ ] Add comprehensive unit tests for 5 different Hogwarts cards (following the pattern in test_elder_wand.py)
-- [ ] Each test file includes multiple test cases covering different scenarios (card registration, effect behavior, edge cases, logging)
-- [ ] Tests use the FakeGame test framework and follow AAA (Arrange-Act-Assert) pattern
-- [ ] All new tests pass successfully
+- [x] Add comprehensive unit tests for 5 different Hogwarts cards
+- [x] Each test file includes multiple test cases covering different scenarios
+- [x] Tests use the FakeGame test framework and follow AAA pattern
+- [x] All new tests pass successfully
 
 ## Selected Cards
 1. **Lumos** (Spell) - Simple spell affecting all heroes with card draw
@@ -365,5 +365,30 @@ python tests/unit/test_<card_name>.py
 <!-- Any specific notes or requirements from the developer -->
 
 ## Work Log
-<!-- Updated as work progresses -->
-- [YYYY-MM-DD] Started task, initial research
+
+### 2025-11-01
+
+#### Completed
+- Created 5 comprehensive test files for Hogwarts cards:
+  - test_lumos.py: 7 tests (all-heroes card draw, empty deck shuffle, drawing disallowed)
+  - test_sorting_hat.py: 7 tests (influence gain, proficiency flag setting, multiple plays)
+  - test_rubeus_hagrid.py: 8 tests (mixed-target effects, healing edge cases)
+  - test_stupefy.py: 8 tests (multi-effect spell, control removal, empty deck)
+  - test_chocolate_frog.py: 10 tests (hero selection, discard effect, healing edge cases)
+- Added 3 proficiency setter methods to FakeHero (can_put_allies_in_deck, can_put_items_in_deck, can_put_spells_in_deck)
+- Fixed critical hero selection test to verify specific hero by identity (not just first hero)
+- Enhanced logging tests to check all card effects (damage, draw, control removal, influence, hearts)
+- Added test_discard_effect_healing_disallowed() for comprehensive discard effect coverage
+- Updated all 5 test files with dedicated type check methods for consistency
+
+#### Decisions
+- Used AAA (Arrange-Act-Assert) pattern throughout all tests
+- Followed existing test structure from test_elder_wand.py, test_expelliarmus.py, and test_reparo.py
+- Added proficiency setters to FakeHero rather than modifying existing proficiency logic
+- Separated type checking into dedicated test methods per code review feedback
+
+#### Results
+- 40 new tests created across 5 test files
+- All 59 tests passing (19 existing + 40 new)
+- All success criteria met
+- Test coverage increased for all-heroes effects, proficiency system, mixed-target mechanics, and discard effects

@@ -41,9 +41,14 @@ class FakeHero:
     """
     A simplified but functional Hero implementation for testing.
 
-    Provides working token tracking, card management, and state flags that cards
-    commonly interact with. Unlike MagicMock, this provides real behavior that
-    can be inspected and verified.
+    Provides working token tracking, card management, proficiency system support,
+    and state flags that cards commonly interact with. Unlike MagicMock, this
+    provides real behavior that can be inspected and verified.
+
+    Proficiency Methods:
+        - can_put_allies_in_deck(game): Enable placing acquired Allies on top of deck
+        - can_put_items_in_deck(game): Enable placing acquired Items on top of deck
+        - can_put_spells_in_deck(game): Enable placing acquired Spells on top of deck
     """
 
     def __init__(self, name="Test Hero", starting_cards=None):
@@ -126,6 +131,18 @@ class FakeHero:
 
     def allow_gaining_tokens_from_allies(self, game):
         self._gaining_from_allies_allowed = True
+
+    def can_put_allies_in_deck(self, game):
+        """Enable proficiency to put acquired Allies on top of deck."""
+        self._can_put_allies_in_deck = True
+
+    def can_put_items_in_deck(self, game):
+        """Enable proficiency to put acquired Items on top of deck."""
+        self._can_put_items_in_deck = True
+
+    def can_put_spells_in_deck(self, game):
+        """Enable proficiency to put acquired Spells on top of deck."""
+        self._can_put_spells_in_deck = True
 
     def add_damage(self, game, amount=1, source=None):
         """Add damage tokens to this hero."""

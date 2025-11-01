@@ -17,10 +17,17 @@ make test-verbose
 
 The test infrastructure is located in `tests/unit/fakes.py` and provides:
 - `FakeGame`: Simplified game object with log capture and programmable input
-- `FakeHero`: Working hero implementation with token tracking and card management
+- `FakeHero`: Working hero implementation with token tracking, card management, and proficiency system support
 - `DummyCard`: Placeholder card objects for testing deck operations
 
-See `tests/unit/test_*.py` for example tests demonstrating different card testing patterns (simple effects, user choices, combo/callback interactions).
+See `tests/unit/test_*.py` for example tests demonstrating different card testing patterns:
+- Simple effects: `test_lumos.py` (all-heroes card draw)
+- Multi-effect spells: `test_stupefy.py` (damage + control removal + draw)
+- Proficiency mechanics: `test_sorting_hat.py` (proficiency flag setting)
+- Mixed-target effects: `test_rubeus_hagrid.py` (active hero vs all heroes)
+- Hero selection and discard effects: `test_chocolate_frog.py` (choose_hero + discard_effect)
+- User choices: `test_reparo.py` (branching card logic)
+- Callback interactions: `test_elder_wand.py` (card effect callbacks)
 
 ## Running the game
 Playing this game requires at least minimal familiarity with the terminal.
