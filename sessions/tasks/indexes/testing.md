@@ -11,7 +11,6 @@ description: Tasks related to test infrastructure, test utilities, and testing t
 ### High Priority
 
 ### Medium Priority
-- `m-implement-test-fakes-hogwarts-cards.md` - Create test fakes/fixtures for unit testing Hogwarts cards
 
 ### Low Priority
 
@@ -19,4 +18,4 @@ description: Tasks related to test infrastructure, test utilities, and testing t
 
 ## Completed Tasks
 <!-- Move tasks here when completed, maintaining the format -->
-- `h-completed-task.md` - Brief description of what was accomplished
+- `m-implement-test-fakes-hogwarts-cards.md` - Created test fakes (FakeGame, FakeHero, DummyCard) and example tests for three card patterns (simple effects, user choices, combo/callbacks). Added Makefile test commands. All 19 tests passing.

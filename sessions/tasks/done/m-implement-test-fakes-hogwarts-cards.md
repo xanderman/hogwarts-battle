@@ -1,7 +1,7 @@
 ---
 name: m-implement-test-fakes-hogwarts-cards
 branch: feature/m-implement-test-fakes-hogwarts-cards
-status: pending
+status: completed
 created: 2025-10-31
 ---
 
@@ -11,10 +11,10 @@ created: 2025-10-31
 Create test fakes/fixtures for Hogwarts cards to enable effective unit testing. Currently, testing cards likely requires complex setup or external dependencies. This task will provide lightweight, flexible test doubles that make it easy to write fast, isolated unit tests for card-related functionality.
 
 ## Success Criteria
-- [ ] Test fake/fixture factories are created for Hogwarts card entities
-- [ ] Unit tests can instantiate cards using fakes without external dependencies
-- [ ] Test fakes support common testing scenarios (valid cards, edge cases, etc.)
-- [ ] Documentation or examples show how to use the fakes in tests
+- [x] Test fake/fixture factories are created for Hogwarts card entities
+- [x] Unit tests can instantiate cards using fakes without external dependencies
+- [x] Test fakes support common testing scenarios (valid cards, edge cases, etc.)
+- [x] Documentation or examples show how to use the fakes in tests
 
 ## Context Manifest
 
@@ -475,5 +475,35 @@ def test_dumbledore_affects_all_heroes():
 <!-- Any specific notes or requirements from the developer -->
 
 ## Work Log
-<!-- Updated as work progresses -->
-- [YYYY-MM-DD] Started task, initial research
+
+### 2025-10-31
+
+#### Completed
+- Created test infrastructure: `tests/unit/` directory with `__init__.py` and `fakes.py`
+- Implemented FakeHero class with working token tracking, card locations, state flags, and callback lists
+- Implemented FakeGame class with log capture, programmable input, and hero collection
+- Implemented supporting classes: FakeHeroes, FakeHeroList, FakeLocations, DummyCard
+- Created example tests for three card patterns:
+  - `test_expelliarmus.py`: Simple card with direct effects (5 tests)
+  - `test_reparo.py`: Choice card with user input (7 tests)
+  - `test_elder_wand.py`: Combo card with callbacks (7 tests)
+- Migrated `hogwarts/test_reparo.py` from MagicMock to fakes, relocated to `tests/unit/`
+- Created Makefile with test command for running all unit tests
+- Addressed code review findings:
+  - Added DummyCard class for test data (proper card-like object)
+  - Fixed hearts callback support in FakeHero.add_hearts()
+  - Added source-is-ally checks to add_damage() and add_influence()
+  - Updated all tests to use DummyCard instead of FakeHero for card data
+- All 19 tests passing
+
+#### Decisions
+- Used "fakes" pattern (working implementations) rather than mocks for better maintainability
+- Organized tests in `tests/unit/` separate from production code
+- DummyCard provides minimal card interface for test data without full card behavior
+- FakeHero implements real token math and state management to catch logic errors
+
+#### Discovered
+- Original test used MagicMock which required brittle setup for each card
+- Cards need both pre-populated play areas and callback execution for combo testing
+- Hero.add_hearts() needs source parameter to identify ally sources
+- Some hero methods check if source is ally to apply certain restrictions

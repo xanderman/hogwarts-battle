@@ -1,6 +1,27 @@
 # hogwarts-battle
 Python curses implementation of Harry Potter: Hogwarts Battle
 
+## Testing
+
+This project includes a unit test suite for testing card implementations. The tests use custom test fakes (test doubles) rather than mocks for better maintainability.
+
+Run all tests:
+```bash
+make test
+```
+
+Run tests with verbose output:
+```bash
+make test-verbose
+```
+
+The test infrastructure is located in `tests/unit/fakes.py` and provides:
+- `FakeGame`: Simplified game object with log capture and programmable input
+- `FakeHero`: Working hero implementation with token tracking and card management
+- `DummyCard`: Placeholder card objects for testing deck operations
+
+See `tests/unit/test_*.py` for example tests demonstrating different card testing patterns (simple effects, user choices, combo/callback interactions).
+
 ## Running the game
 Playing this game requires at least minimal familiarity with the terminal.
 You'll need to know at least how to run a python script (and download the code
