@@ -11,6 +11,7 @@ description: Tasks related to modernizing the codebase including adding type hin
 ### High Priority
 
 ### Medium Priority
+- `m-refactor-add-type-hints.md` - Add comprehensive type hints to the Python codebase
 
 ### Low Priority
 
